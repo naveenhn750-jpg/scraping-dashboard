@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Scout Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0c10; --surface: #111318; --surface2: #181b23; --surface3: #1f2230;
+      --border: #252836; --border2: #2e3245;
+      --text: #eef0f8; --text2: #8b91b5; --text3: #4a5070;
+      --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
+      --r: 16px; --rs: 10px;
+    }
+
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--sans); min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 1.1rem 2rem; border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, #6c63ff, #a78bfa);
+      display: grid; place-items: center; font-size: 16px;
+    }
+    .brand-name { font-size: 15px; font-weight: 700; }
+    .brand-sub  { font-size: 11px; color: var(--text3); margin-top: 1px; }
+    .header-badge {
+      font-size: 11px; font-weight: 600; padding: 4px 10px;
+      border-radius: 999px; background: #1a1730;
+      border: 1px solid #3d3575; color: #a78bfa;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Main layout ── */
+    .page { max-width: 1000px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+
+    .page-title { font-size: 28px; font-weight: 800; margin-bottom: 4px; }
+    .page-title span { background: linear-gradient(90deg, #a78bfa, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .page-sub { color: var(--text3); font-size: 13px; margin-bottom: 2.5rem; }
+
+    /* ── Platform Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 2.5rem;
+    }
+
+    .platform-card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--r);
+      padding: 1.6rem 1.2rem 1.3rem;
+      cursor: pointer;
+      transition: border-color 0.18s, transform 0.15s, box-shadow 0.18s;
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      position: relative; overflow: hidden;
+      user-select: none;
+    }
+    .platform-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: var(--card-color);
+      opacity: 0; transition: opacity 0.18s;
+    }
+    .platform-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,0.4); }
+    .platform-card:hover::before { opacity: 1; }
+    .platform-card.active {
+      border-color: var(--card-color);
+      box-shadow: 0 0 0 1px var(--card-color), 0 8px 24px rgba(0,0,0,0.5);
+    }
+    .platform-card.active::before { opacity: 1; }
+
+    .platform-logo {
+      width: 56px; height: 56px; border-radius: 14px;
+      display: grid; place-items: center;
+      font-size: 28px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      transition: background 0.18s;
+      flex-shrink: 0;
+    }
+    .platform-card:hover .platform-logo,
+    .platform-card.active .platform-logo {
+      background: var(--surface3);
+    }
+    .platform-name {
+      font-size: 13px; font-weight: 700; letter-spacing: 0.01em;
+    }
+    .platform-tag {
+      font-size: 10px; color: var(--text3); font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .platform-coming {
+      font-size: 10px; font-weight: 600; padding: 2px 8px;
+      border-radius: 999px; background: var(--surface2);
+      border: 1px solid var(--border2); color: var(--text3);
+    }
+    .platform-live {
+      font-size: 10px; font-weight: 600; padding: 2px 8px;
+      border-radius: 999px; color: var(--card-color);
+      background: color-mix(in srgb, var(--card-color) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--card-color) 35%, transparent);
+    }
+
+    /* per-platform accent */
+    .card-amazon   { --card-color: #f5a623; }
+    .card-flipkart { --card-color: #2874f0; }
+    .card-myntra   { --card-color: #ff3f6c; }
+    .card-swiggy   { --card-color: #ff6d2d; }
+    .card-zepto    { --card-color: #8b5cf6; }
+
+    /* ── Tool Panel ── */
+    .tool-panel {
+      display: none;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+      animation: slideIn 0.2s ease;
+    }
+    .tool-panel.show { display: block; }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .panel-header {
+      padding: 1rem 1.4rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+      background: var(--surface2);
+    }
+    .panel-header-logo {
+      width: 30px; height: 30px; border-radius: 8px;
+      display: grid; place-items: center; font-size: 16px;
+      background: color-mix(in srgb, var(--active-color) 15%, transparent);
+    }
+    .panel-title { font-size: 14px; font-weight: 700; }
+    .panel-sub   { font-size: 11px; color: var(--text3); }
+    .close-btn {
+      margin-left: auto; background: none; border: none;
+      color: var(--text3); cursor: pointer; font-size: 18px; line-height: 1;
+      padding: 4px; border-radius: 6px; transition: color 0.12s, background 0.12s;
+    }
+    .close-btn:hover { color: var(--text); background: var(--surface3); }
+
+    .panel-body { padding: 1.4rem; }
+
+    /* ── Search ── */
+    .search-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .search-input {
+      flex: 1; background: var(--surface2); border: 1.5px solid var(--border2);
+      border-radius: var(--rs); color: var(--text);
+      font-family: var(--mono); font-size: 14px; padding: 10px 14px;
+      letter-spacing: 0.06em; outline: none;
+      transition: border-color 0.15s;
+    }
+    .search-input::placeholder { color: var(--text3); }
+    .search-input:focus { border-color: var(--active-color, #a78bfa); }
+    .domain-sel {
+      background: var(--surface2); border: 1.5px solid var(--border2);
+      color: var(--text2); font-family: var(--mono); font-size: 12px;
+      padding: 10px 10px; border-radius: var(--rs); outline: none; cursor: pointer;
+    }
+    .fetch-btn {
+      background: var(--active-color, #a78bfa);
+      border: none; border-radius: var(--rs);
+      color: #0a0c10; font-family: var(--sans); font-size: 13px; font-weight: 700;
+      padding: 10px 18px; cursor: pointer; white-space: nowrap;
+      transition: opacity 0.12s, transform 0.1s;
+    }
+    .fetch-btn:hover { opacity: 0.88; }
+    .fetch-btn:active { transform: scale(0.97); }
+    .fetch-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 1.2rem; }
+    .chip-label { font-size: 11px; color: var(--text3); }
+    .chip {
+      font-family: var(--mono); font-size: 11px; padding: 3px 9px;
+      border: 1px solid var(--border2); border-radius: 999px;
+      cursor: pointer; color: var(--text3); background: var(--surface2);
+      transition: border-color 0.1s, color 0.1s;
+    }
+    .chip:hover { border-color: var(--active-color, #a78bfa); color: var(--active-color, #a78bfa); }
+
+    /* ── Loader ── */
+    .loader { display: none; flex-direction: column; align-items: center; gap: 10px; padding: 2rem 0; }
+    .loader.show { display: flex; }
+    .ring {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border2);
+      border-top-color: var(--active-color, #a78bfa);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-msg { color: var(--text2); font-size: 13px; }
+
+    /* ── Error ── */
+    .error-box {
+      display: none; background: #1e1212; border: 1px solid #5a1d1d;
+      border-radius: var(--rs); padding: 0.8rem 1rem;
+      color: #ef4444; font-size: 13px; gap: 8px; align-items: center;
+      margin-bottom: 1rem;
+    }
+    .error-box.show { display: flex; }
+
+    /* ── Result card ── */
+    .result { display: none; }
+    .result.show { display: block; }
+    .rcard {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--rs); padding: 1.25rem;
+    }
+    .badge {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      letter-spacing: 0.07em; text-transform: uppercase;
+      padding: 3px 10px; border-radius: 4px; margin-bottom: 10px;
+    }
+    .badge-in  { background: #0f2e1a; color: #22c55e; border: 1px solid #1a4d2a; }
+    .badge-out { background: #2e0f0f; color: #ef4444; border: 1px solid #4d1a1a; }
+    .badge-low { background: #2e2310; color: #eab308; border: 1px solid #4d3a18; }
+    .badge-unk { background: var(--surface3); color: var(--text3); border: 1px solid var(--border); }
+    .product-title { font-size: 14px; font-weight: 600; line-height: 1.5; margin-bottom: 1rem; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1rem; }
+    .stat {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--rs); padding: 0.75rem 0.9rem;
+    }
+    .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); margin-bottom: 4px; }
+    .stat-value { font-size: 20px; font-weight: 700; font-family: var(--mono); }
+    .stat-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+    .card-footer {
+      border-top: 1px solid var(--border); padding-top: 0.8rem;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; flex-wrap: wrap;
+    }
+    .asin-mono { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+    .asin-mono span { color: var(--text2); }
+    .footer-btns { display: flex; gap: 6px; }
+    .btn-sec {
+      background: var(--surface3); border: 1px solid var(--border2);
+      color: var(--text2); font-size: 11px; font-weight: 500;
+      padding: 5px 10px; border-radius: var(--rs); cursor: pointer;
+      transition: background 0.1s; display: flex; align-items: center; gap: 4px;
+    }
+    .btn-sec:hover { background: var(--border2); color: var(--text); }
+    .btn-primary {
+      background: var(--active-color, #a78bfa); border: none;
+      color: #0a0c10; font-size: 11px; font-weight: 700;
+      padding: 5px 12px; border-radius: var(--rs); cursor: pointer;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+
+    /* ── Coming soon ── */
+    .coming-soon {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 12px; padding: 2.5rem 1rem; text-align: center;
+    }
+    .coming-soon-icon { font-size: 40px; }
+    .coming-soon h3 { font-size: 16px; font-weight: 700; }
+    .coming-soon p { font-size: 13px; color: var(--text3); max-width: 300px; line-height: 1.6; }
+    .notify-badge {
+      font-size: 11px; font-weight: 600; padding: 5px 14px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--active-color) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--active-color) 35%, transparent);
+      color: var(--active-color);
+    }
+
+    @media (max-width: 600px) {
+      .grid { grid-template-columns: repeat(2, 1fr); }
+      header { padding: 1rem; }
+      .page { padding: 1.5rem 1rem 4rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-icon">🔭</div>
+    <div>
+      <div class="brand-name">Scout Dashboard</div>
+      <div class="brand-sub">Multi-platform product lookup</div>
+    </div>
+  </div>
+  <div class="header-badge">5 Platforms</div>
+</header>
+
+<div class="page">
+  <div class="page-title">Pick a <span>Platform</span></div>
+  <div class="page-sub">Select any platform below to open its lookup tool</div>
+
+  <div class="grid">
+
+    <!-- Amazon -->
+    <div class="platform-card card-amazon" onclick="openTool('amazon')">
+      <div class="platform-logo">🛒</div>
+      <div style="text-align:center">
+        <div class="platform-name">Amazon</div>
+        <div class="platform-tag">E-Commerce</div>
+      </div>
+      <div class="platform-live" style="--card-color:#f5a623">● Live</div>
+    </div>
+
+    <!-- Flipkart -->
+    <div class="platform-card card-flipkart" onclick="openTool('flipkart')">
+      <div class="platform-logo">🏪</div>
+      <div style="text-align:center">
+        <div class="platform-name">Flipkart</div>
+        <div class="platform-tag">E-Commerce</div>
+      </div>
+      <div class="platform-coming">Coming Soon</div>
+    </div>
+
+    <!-- Myntra -->
+    <div class="platform-card card-myntra" onclick="openTool('myntra')">
+      <div class="platform-logo">👗</div>
+      <div style="text-align:center">
+        <div class="platform-name">Myntra</div>
+        <div class="platform-tag">Fashion</div>
+      </div>
+      <div class="platform-coming">Coming Soon</div>
+    </div>
+
+    <!-- Swiggy -->
+    <div class="platform-card card-swiggy" onclick="openTool('swiggy')">
+      <div class="platform-logo">🍔</div>
+      <div style="text-align:center">
+        <div class="platform-name">Swiggy</div>
+        <div class="platform-tag">Food Delivery</div>
+      </div>
+      <div class="platform-coming">Coming Soon</div>
+    </div>
+
+    <!-- Zepto -->
+    <div class="platform-card card-zepto" onclick="openTool('zepto')">
+      <div class="platform-logo">⚡</div>
+      <div style="text-align:center">
+        <div class="platform-name">Zepto</div>
+        <div class="platform-tag">Quick Commerce</div>
+      </div>
+      <div class="platform-coming">Coming Soon</div>
+    </div>
+
+  </div>
+
+  <!-- Tool Panel -->
+  <div class="tool-panel" id="toolPanel">
+    <div class="panel-header" id="panelHeader">
+      <div class="panel-header-logo" id="panelLogo"></div>
+      <div>
+        <div class="panel-title" id="panelTitle"></div>
+        <div class="panel-sub" id="panelSub"></div>
+      </div>
+      <button class="close-btn" onclick="closeTool()">✕</button>
+    </div>
+    <div class="panel-body" id="panelBody"></div>
+  </div>
+
+</div>
+
+<script>
+  const PLATFORMS = {
+    amazon: {
+      name: 'Amazon',
+      emoji: '🛒',
+      sub: 'Product lookup by ASIN',
+      color: '#f5a623',
+      live: true,
+      chips: ['B0FY66N9RX','B0DGXWJLX4','B09G9FPHY6','B08N5WRWNW'],
+      placeholder: 'Enter ASIN e.g. B09G9FPHY6',
+      domains: ['amazon.in','amazon.com','amazon.co.uk','amazon.de'],
+    },
+    flipkart: { name:'Flipkart', emoji:'🏪', sub:'Product lookup', color:'#2874f0', live:false },
+    myntra:   { name:'Myntra',   emoji:'👗', sub:'Fashion lookup',  color:'#ff3f6c', live:false },
+    swiggy:   { name:'Swiggy',   emoji:'🍔', sub:'Food lookup',     color:'#ff6d2d', live:false },
+    zepto:    { name:'Zepto',    emoji:'⚡',  sub:'Grocery lookup',  color:'#8b5cf6', live:false },
+  };
+
+  let activePlatform = null;
+  let history = {};
+
+  function openTool(id) {
+    const p = PLATFORMS[id];
+    if (!p) return;
+
+    // Update active card
+    document.querySelectorAll('.platform-card').forEach(c => c.classList.remove('active'));
+    document.querySelector(`.card-${id}`).classList.add('active');
+
+    activePlatform = id;
+
+    // Set panel colors
+    const panel = document.getElementById('toolPanel');
+    panel.style.setProperty('--active-color', p.color);
+    panel.style.borderColor = p.color + '55';
+
+    document.getElementById('panelLogo').textContent = p.emoji;
+    document.getElementById('panelTitle').textContent = p.name;
+    document.getElementById('panelSub').textContent = p.sub;
+
+    document.getElementById('panelBody').innerHTML = p.live
+      ? buildAmazonTool(p)
+      : buildComingSoon(p);
+
+    panel.classList.add('show');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function closeTool() {
+    document.getElementById('toolPanel').classList.remove('show');
+    document.querySelectorAll('.platform-card').forEach(c => c.classList.remove('active'));
+    activePlatform = null;
+  }
+
+  function buildComingSoon(p) {
+    return `
+      <div class="coming-soon">
+        <div class="coming-soon-icon">${p.emoji}</div>
+        <h3>${p.name} Lookup</h3>
+        <p>We're building the ${p.name} scraper. It'll work just like Amazon — enter a product ID and get live price, rating & availability.</p>
+        <div class="notify-badge" style="--active-color:${p.color}">🚧 In Development</div>
+      </div>`;
+  }
+
+  function buildAmazonTool(p) {
+    const domainOptions = p.domains.map(d =>
+      `<option value="${d}">${d}</option>`
+    ).join('');
+    const chipHtml = p.chips.map(c =>
+      `<span class="chip" onclick="fillAsin('${c}')">${c}</span>`
+    ).join('');
+
+    return `
+      <div class="search-row">
+        <input class="search-input" id="asinInput" placeholder="${p.placeholder}" maxlength="10"
+               oninput="this.value=this.value.toUpperCase()"
+               onkeydown="if(event.key==='Enter')doFetch()"/>
+        <select class="domain-sel" id="domainSel">${domainOptions}</select>
+        <button class="fetch-btn" id="fetchBtn" onclick="doFetch()">Fetch</button>
+      </div>
+      <div class="chips">
+        <span class="chip-label">Try:</span>
+        ${chipHtml}
+      </div>
+      <div class="loader" id="loader">
+        <div class="ring"></div>
+        <div class="loader-msg">Fetching from Amazon…</div>
+      </div>
+      <div class="error-box" id="errBox">⚠️ <span id="errMsg"></span></div>
+      <div class="result" id="result"></div>`;
+  }
+
+  function fillAsin(asin) {
+    const inp = document.getElementById('asinInput');
+    if (inp) { inp.value = asin; inp.focus(); }
+  }
+
+  async function doFetch() {
+    const asin   = (document.getElementById('asinInput')?.value || '').trim().toUpperCase();
+    const domain = document.getElementById('domainSel')?.value || 'amazon.in';
+    const btn    = document.getElementById('fetchBtn');
+    const loader = document.getElementById('loader');
+    const errBox = document.getElementById('errBox');
+    const result = document.getElementById('result');
+
+    if (!asin || !/^[A-Z0-9]{10}$/.test(asin)) {
+      showErr('Enter a valid 10-character ASIN.');
+      return;
+    }
+
+    btn.disabled = true;
+    loader.classList.add('show');
+    errBox.classList.remove('show');
+    result.classList.remove('show');
+
+    try {
+      const res  = await fetch(`/api/product?asin=${asin}&domain=${domain}`);
+      const data = await res.json();
+
+      loader.classList.remove('show');
+      btn.disabled = false;
+
+      if (data.error) { showErr(data.error); return; }
+
+      // Store history
+      if (!history[asin]) history[asin] = [];
+      history[asin].unshift({ price: data.price, ts: new Date().toLocaleTimeString() });
+      if (history[asin].length > 5) history[asin].pop();
+
+      result.innerHTML = buildResult(data, domain);
+      result.classList.add('show');
+
+    } catch(e) {
+      loader.classList.remove('show');
+      btn.disabled = false;
+      showErr('Network error. Please try again.');
+    }
+  }
+
+  function showErr(msg) {
+    const loader = document.getElementById('loader');
+    const errBox = document.getElementById('errBox');
+    const btn    = document.getElementById('fetchBtn');
+    loader?.classList.remove('show');
+    if (btn) btn.disabled = false;
+    if (errBox) {
+      document.getElementById('errMsg').textContent = msg;
+      errBox.classList.add('show');
+    }
+  }
+
+  function buildResult(d, domain) {
+    const stockClass = d.availability === 'In Stock'  ? 'badge-in'
+                     : d.availability === 'Out of Stock' ? 'badge-out'
+                     : d.availability === 'Low Stock'    ? 'badge-low' : 'badge-unk';
+    const price = d.price ? `${d.price.toLocaleString('en-IN')}` : '—';
+    const currency = d.currency || 'INR';
+    const rating = d.rating ? `${d.rating} ★` : '—';
+    const histItems = (history[d.asin] || []).map(h =>
+      `${h.ts}  →  ${h.price ? currency + ' ' + h.price.toLocaleString('en-IN') : '—'}`
+    ).join('\n') || 'No history yet.';
+
+    return `
+      <div class="rcard">
+        <span class="badge ${stockClass}">${d.availability}</span>
+        <div class="product-title">${d.title || 'Title unavailable'}</div>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">Current Price</div>
+            <div class="stat-value" style="color:var(--active-color)">${price}</div>
+            <div class="stat-sub">${currency}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Rating</div>
+            <div class="stat-value" style="color:#eab308;font-size:16px">${rating}</div>
+            <div class="stat-sub">out of 5</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Last Fetched</div>
+            <div class="stat-value" style="font-size:13px;padding-top:4px">${new Date().toLocaleTimeString()}</div>
+            <div class="stat-sub">just now</div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="asin-mono">ASIN: <span>${d.asin}</span></div>
+          <div class="footer-btns">
+            <button class="btn-sec" onclick="navigator.clipboard.writeText('${d.asin}')">📋 Copy</button>
+            <button class="btn-sec" onclick="doFetch()">↻ Refresh</button>
+            <a href="${d.url}" target="_blank">
+              <button class="btn-primary">View on ${domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1)} ↗</button>
+            </a>
+          </div>
+        </div>
+        <div style="margin-top:1rem">
+          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+            Price History <span style="flex:1;height:1px;background:var(--border);display:block"></span>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:.65rem 1rem;font-size:12px;color:var(--text3);font-family:var(--mono);white-space:pre-wrap;line-height:1.9">${histItems}</div>
+        </div>
+      </div>`;
+  }
+</script>
+</body>
+</html>

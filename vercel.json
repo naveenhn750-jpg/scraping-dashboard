@@ -1,23 +1,13 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "api/product.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "index.html",
-      "use": "@vercel/static"
-    }
+    { "src": "api/product.py", "use": "@vercel/python" },
+    { "src": "*.html", "use": "@vercel/static" }
   ],
   "routes": [
-    {
-      "src": "/api/product",
-      "dest": "/api/product.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
+    { "src": "/api/product", "dest": "/api/product.py" },
+    { "src": "/scout", "dest": "/index.html" },
+    { "src": "/", "dest": "/dashboard.html" },
+    { "src": "/(.*)", "dest": "/dashboard.html" }
   ]
 }
