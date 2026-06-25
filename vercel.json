@@ -2,13 +2,11 @@
   "version": 2,
   "builds": [
     { "src": "api/product.py", "use": "@vercel/python" },
-    { "src": "dashboard.html", "use": "@vercel/static" },
-    { "src": "index.html", "use": "@vercel/static" }
+    { "src": "*.html", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/product", "dest": "/api/product.py" },
-    { "src": "/amazon", "dest": "/index.html" },
-    { "src": "^/$", "dest": "/dashboard.html" },
-    { "src": "^/dashboard$", "dest": "/dashboard.html" }
+    { "src": "/amazon", "dest": "/index_amazon.html" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
