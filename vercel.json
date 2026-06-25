@@ -1,12 +1,8 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "api/product.py", "use": "@vercel/python" },
-    { "src": "*.html", "use": "@vercel/static" }
-  ],
   "routes": [
     { "src": "/api/product", "dest": "/api/product.py" },
     { "src": "/amazon", "dest": "/amazon.html" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "/", "dest": "/index.html" }
   ]
 }
