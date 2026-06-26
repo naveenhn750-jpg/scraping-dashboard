@@ -1,11 +1,12 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "product.py", "use": "@vercel/python" },
-    { "src": "index.html", "use": "@vercel/static" }
-  ],
+  "functions": {
+    "api/product.py": {
+      "runtime": "python3.9"
+    }
+  },
   "routes": [
-    { "src": "/api/product", "dest": "/product.py" },
+    { "src": "/api/product", "dest": "/api/product.py" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
