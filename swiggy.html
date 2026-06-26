@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Swiggy Scout</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --accent: #ff6d2d;
+      --bg: #0a0c10; --surface: #111318; --surface2: #181b23; --surface3: #1f2230;
+      --border: #252836; --border2: #2e3245;
+      --text: #eef0f8; --text2: #8b91b5; --text3: #4a5070;
+      --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
+      --r: 16px; --rs: 10px;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+
+    header {
+      padding: 1.1rem 2rem; border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-icon {
+      width: 36px; height: 36px; border-radius: 10px; font-size: 18px;
+      background: color-mix(in srgb, var(--accent) 15%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+      display: grid; place-items: center;
+    }
+    .brand-name { font-size: 15px; font-weight: 700; }
+    .brand-sub  { font-size: 11px; color: var(--text3); margin-top: 1px; }
+    .back-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--surface2); border: 1px solid var(--border2);
+      color: var(--text2); font-size: 12px; font-weight: 600;
+      padding: 7px 14px; border-radius: var(--rs); cursor: pointer;
+      text-decoration: none; transition: background 0.12s, color 0.12s;
+    }
+    .back-btn:hover { background: var(--surface3); color: var(--text); }
+
+    .page { max-width: 900px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+    .hero { text-align: center; margin-bottom: 2.5rem; }
+    .hero-icon {
+      width: 72px; height: 72px; border-radius: 20px; font-size: 36px;
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+      display: grid; place-items: center; margin: 0 auto 1rem;
+    }
+    .hero h1 { font-size: 32px; font-weight: 800; margin-bottom: 6px; }
+    .hero h1 span { color: var(--accent); }
+    .hero p { color: var(--text3); font-size: 14px; }
+
+    /* Tabs */
+    .tabs {
+      display: flex; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 4px; margin-bottom: 1.5rem; gap: 4px;
+    }
+    .tab {
+      flex: 1; text-align: center; padding: 10px; border-radius: 9px;
+      font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text3);
+      transition: background 0.15s, color 0.15s; border: none; background: none;
+    }
+    .tab.active { background: var(--surface2); color: var(--text); }
+
+    /* Search box */
+    .search-card {
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: var(--r); padding: 1.5rem;
+    }
+    .search-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .search-input {
+      flex: 1; background: var(--surface2); border: 1.5px solid var(--border2);
+      border-radius: var(--rs); color: var(--text);
+      font-family: var(--mono); font-size: 14px; padding: 12px 16px;
+      outline: none; transition: border-color 0.15s;
+    }
+    .search-input::placeholder { color: var(--text3); }
+    .search-input:focus { border-color: var(--accent); }
+    .fetch-btn {
+      background: var(--accent); border: none; border-radius: var(--rs);
+      color: #fff; font-family: var(--sans); font-size: 13px; font-weight: 700;
+      padding: 12px 22px; cursor: pointer; white-space: nowrap;
+      transition: opacity 0.12s; letter-spacing: 0.02em;
+    }
+    .fetch-btn:hover { opacity: 0.85; }
+
+    /* Bulk upload */
+    .bulk-section { display: none; }
+    .bulk-section.show { display: block; }
+    .single-section { display: block; }
+    .single-section.hide { display: none; }
+
+    .upload-zone {
+      border: 2px dashed var(--border2); border-radius: var(--r);
+      padding: 2.5rem; text-align: center; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s; margin-bottom: 1rem;
+    }
+    .upload-zone:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); }
+    .upload-icon { font-size: 36px; margin-bottom: 10px; }
+    .upload-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .upload-sub { font-size: 12px; color: var(--text3); }
+    .upload-input { display: none; }
+
+    /* Format guide */
+    .format-guide {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--rs); padding: 1rem 1.2rem; margin-bottom: 1rem;
+    }
+    .format-title { font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .format-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text3); margin-bottom: 4px; }
+    .format-row span { font-size: 14px; }
+
+    /* Coming soon overlay for bulk */
+    .coming-panel {
+      text-align: center; padding: 2rem;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--r);
+    }
+    .coming-panel h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .coming-panel p { font-size: 13px; color: var(--text3); }
+    .coming-tag {
+      display: inline-block; margin-top: 12px;
+      font-size: 11px; font-weight: 600; padding: 4px 12px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+      color: var(--accent);
+    }
+
+    /* Result */
+    .result { display: none; margin-top: 1rem; }
+    .result.show { display: block; }
+    .loader { display: none; text-align: center; padding: 2rem; }
+    .loader.show { display: block; }
+    .ring {
+      width: 36px; height: 36px; margin: 0 auto 10px;
+      border: 3px solid var(--border2); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error-box {
+      display: none; background: #1e1212; border: 1px solid #5a1d1d;
+      border-radius: var(--rs); padding: 0.8rem 1rem;
+      color: #ef4444; font-size: 13px; margin-top: 1rem;
+    }
+    .error-box.show { display: block; }
+    .rcard {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--rs); padding: 1.25rem;
+    }
+    .badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 3px 10px; border-radius: 4px; margin-bottom: 10px; }
+    .badge-in  { background: #0f2e1a; color: #22c55e; border: 1px solid #1a4d2a; }
+    .badge-out { background: #2e0f0f; color: #ef4444; border: 1px solid #4d1a1a; }
+    .badge-unk { background: var(--surface3); color: var(--text3); border: 1px solid var(--border); }
+    .product-title { font-size: 15px; font-weight: 600; line-height: 1.5; margin-bottom: 1rem; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1rem; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--rs); padding: 0.75rem 0.9rem; }
+    .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); margin-bottom: 4px; }
+    .stat-value { font-size: 20px; font-weight: 700; font-family: var(--mono); color: var(--accent); }
+    .stat-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+    .card-footer { border-top: 1px solid var(--border); padding-top: 0.8rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .id-mono { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+    .id-mono span { color: var(--text2); }
+    .btn-sec { background: var(--surface3); border: 1px solid var(--border2); color: var(--text2); font-size: 11px; font-weight: 500; padding: 5px 10px; border-radius: var(--rs); cursor: pointer; }
+    .btn-sec:hover { background: var(--border2); color: var(--text); }
+    .btn-primary { background: var(--accent); border: none; color: #fff; font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: var(--rs); cursor: pointer; text-decoration: none; display: inline-block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-icon">🍔</div>
+    <div>
+      <div class="brand-name">Swiggy Scout</div>
+      <div class="brand-sub">Food Delivery Lookup</div>
+    </div>
+  </div>
+  <a href="/" class="back-btn">← Dashboard</a>
+</header>
+
+<div class="page">
+  <div class="hero">
+    <div class="hero-icon">🍔</div>
+    <h1>Swiggy <span>Price Scout</span></h1>
+    <p>Search restaurants & dishes</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('single', this)">Single Lookup</button>
+    <button class="tab" onclick="switchTab('bulk', this)">Bulk Upload (Excel / CSV)</button>
+  </div>
+
+  <div class="search-card">
+    <!-- Single -->
+    <div class="single-section" id="singleSection">
+      <div class="search-row">
+        <input class="search-input" id="idInput" placeholder="Enter Swiggy Product ID / SKU" onkeydown="if(event.key==='Enter')doFetch()"/>
+        <button class="fetch-btn" id="fetchBtn" onclick="doFetch()">Fetch</button>
+      </div>
+      <div style="font-size:12px;color:var(--text3)">Enter a valid Swiggy product ID to fetch live price, rating & availability</div>
+      <div class="loader" id="loader"><div class="ring"></div><div style="color:var(--text2);font-size:13px">Fetching from Swiggy…</div></div>
+      <div class="error-box" id="errBox"></div>
+      <div class="result" id="result"></div>
+    </div>
+
+    <!-- Bulk -->
+    <div class="bulk-section" id="bulkSection">
+      <div class="coming-panel">
+        <div style="font-size:40px;margin-bottom:12px">🍔</div>
+        <h3>Bulk Upload for Swiggy</h3>
+        <p>Upload an Excel or CSV file with multiple product IDs and fetch them all in parallel.</p>
+        <div class="coming-tag">🚧 Coming Soon</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function switchTab(tab, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    if (tab === 'single') {
+      document.getElementById('singleSection').classList.remove('hide');
+      document.getElementById('bulkSection').classList.remove('show');
+    } else {
+      document.getElementById('singleSection').classList.add('hide');
+      document.getElementById('bulkSection').classList.add('show');
+    }
+  }
+
+  async function doFetch() {
+    const id  = document.getElementById('idInput').value.trim();
+    const btn = document.getElementById('fetchBtn');
+    const loader = document.getElementById('loader');
+    const errBox = document.getElementById('errBox');
+    const result = document.getElementById('result');
+    if (!id) { errBox.textContent = 'Please enter a product ID.'; errBox.classList.add('show'); return; }
+    btn.disabled = true;
+    loader.classList.add('show');
+    errBox.classList.remove('show');
+    result.classList.remove('show');
+    // Simulate coming soon response
+    setTimeout(() => {
+      loader.classList.remove('show');
+      btn.disabled = false;
+      errBox.textContent = 'Swiggy scraper is coming soon! Only Amazon is live right now.';
+      errBox.classList.add('show');
+    }, 1000);
+  }
+</script>
+</body>
+</html>

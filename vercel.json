@@ -2,12 +2,15 @@
   "version": 2,
   "builds": [
     { "src": "api/product.py", "use": "@vercel/python" },
-    { "src": "index.html", "use": "@vercel/static" },
-    { "src": "amazon.html", "use": "@vercel/static" }
+    { "src": "*.html", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/product", "dest": "/api/product.py" },
-    { "src": "/amazon", "dest": "/amazon.html" },
-    { "src": "/", "dest": "/index.html" }
+    { "src": "/amazon",   "dest": "/amazon.html" },
+    { "src": "/flipkart", "dest": "/flipkart.html" },
+    { "src": "/myntra",   "dest": "/myntra.html" },
+    { "src": "/swiggy",   "dest": "/swiggy.html" },
+    { "src": "/zepto",    "dest": "/zepto.html" },
+    { "src": "/",         "dest": "/index.html" }
   ]
 }
