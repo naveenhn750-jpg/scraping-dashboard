@@ -2,7 +2,6 @@
   "version": 2,
   "routes": [
     { "src": "/api/product", "dest": "/api/product.py" },
-    { "src": "/amazon", "dest": "/amazon.html" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
