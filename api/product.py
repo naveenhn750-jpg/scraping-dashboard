@@ -13,9 +13,15 @@ import requests
 # ---------------------------------------------------------
 SCRAPER_API_KEY = os.environ.get("SCRAPER_API_KEY", "")
 
-def scraper_api_url(target_url):
-    from urllib.parse import quote
-    return f"https://app.scrapingbee.com/api/v1/?api_key={SCRAPER_API_KEY}&url={quote(target_url)}&render_js=false&premium_proxy=true"
+def fetch_via_scrapingbee(target_url):
+    params = {
+        "api_key": SCRAPER_API_KEY,
+        "url": target_url,
+        "render_js": "false",
+        "premium_proxy": "true",
+        "country_code": "in",
+    }
+    return requests.get("https://app.scrapingbee.com/api/v1/", params=params, timeout=55)
 
 # ---------------------------------------------------------
 # HELPER FUNCTIONS
@@ -119,8 +125,7 @@ def is_dead_page(html):
 
 def fetch_page(url):
     try:
-        proxy_url = scraper_api_url(url)
-        resp = requests.get(proxy_url, timeout=60)
+        resp = fetch_via_scrapingbee(url)
         if resp.status_code == 200:
             html = resp.text
             if is_dead_page(html):
