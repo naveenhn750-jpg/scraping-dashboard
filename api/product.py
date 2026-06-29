@@ -1,13 +1,20 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import re
+import os
 import time
 import random
-import pandas as pd
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
-
 import requests
+
+# ---------------------------------------------------------
+# SCRAPER API CONFIG (key loaded from environment variable)
+# ---------------------------------------------------------
+SCRAPER_API_KEY = os.environ.get("SCRAPER_API_KEY", "")
+
+def scraper_api_url(target_url):
+    return f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target_url}&render=true"
 
 # ---------------------------------------------------------
 # HELPER FUNCTIONS
@@ -38,11 +45,7 @@ def parse_count_to_number(text):
     return "0"
 
 def extract_data(soup):
-    data = {
-        "Price": "0",
-        "Rating": "0",
-        "Rating_Count": "0"
-    }
+    data = {"Price": "0", "Rating": "0", "Rating_Count": "0"}
 
     # --- PRICE ---
     raw_price = ""
@@ -68,10 +71,7 @@ def extract_data(soup):
             raw_price = clean_only_numbers(whole_price.get_text(strip=True))
 
     if raw_price:
-        if "." in raw_price:
-            data["Price"] = raw_price.split(".")[0]
-        else:
-            data["Price"] = raw_price
+        data["Price"] = raw_price.split(".")[0] if "." in raw_price else raw_price
 
     availability = soup.select_one("#availability")
     if availability and "currently unavailable" in availability.get_text(strip=True).lower():
@@ -116,55 +116,33 @@ def is_dead_page(html):
         "we couldn't find that page",
     ])
 
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15",
-]
-
-def get_headers():
-    return {
-        "User-Agent": random.choice(USER_AGENTS),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-IN,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Cache-Control": "no-cache",
-    }
-
-def fetch_with_retry(url, max_attempts=6):
-    session = requests.Session()
-    for attempt in range(max_attempts):
-        try:
-            if attempt > 0:
-                time.sleep(random.uniform(0.5, 1.5) * attempt)
-            session.headers.update(get_headers())
-            resp = session.get(url, timeout=12, allow_redirects=True)
-            if resp.status_code == 404:
-                return None, "Product not found. Check the ASIN."
-            if resp.status_code in (503, 429, 403):
-                continue
-            if resp.status_code != 200:
-                continue
+def fetch_page(url):
+    try:
+        proxy_url = scraper_api_url(url)
+        resp = requests.get(proxy_url, timeout=60)
+        if resp.status_code == 200:
             html = resp.text
             if is_dead_page(html):
                 return None, "DEAD_PAGE"
             if is_blocked(html):
-                continue
+                return None, "Amazon blocked the request. Try again."
             return html, None
-        except Exception:
-            continue
-    return None, "Amazon blocked all attempts. Try again in a moment."
+        elif resp.status_code == 401:
+            return None, "Invalid API key."
+        elif resp.status_code == 403:
+            return None, "API quota exceeded."
+        else:
+            return None, f"Request failed with status {resp.status_code}."
+    except Exception as e:
+        return None, f"Request error: {str(e)}"
 
 def scrape(asin, domain):
     try:
         url = f"https://www.{domain}/dp/{asin}?th=1&psc=1"
-        html, err = fetch_with_retry(url, max_attempts=6)
+        html, err = fetch_page(url)
+
         if err == "DEAD_PAGE":
-            return {"error": "Product does not exist on Amazon. The ASIN may be invalid or delisted.", "status": 404, "dead": True}
+            return {"error": "Product does not exist. The ASIN may be invalid or delisted.", "status": 404, "dead": True}
         if err:
             return {"error": err, "status": 422}
 
