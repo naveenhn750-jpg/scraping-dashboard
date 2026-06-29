@@ -3,34 +3,96 @@ import json
 import re
 import time
 import random
+import pandas as pd
+from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 
 import requests
-from bs4 import BeautifulSoup
 
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15",
-]
+# ---------------------------------------------------------
+# HELPER FUNCTIONS
+# ---------------------------------------------------------
 
-def get_headers():
-    ua = random.choice(USER_AGENTS)
-    return {
-        "User-Agent": ua,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-IN,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
+def clean_only_numbers(text):
+    if not text:
+        return ""
+    text = text.replace(",", "")
+    match = re.search(r"(\d+(\.\d+)?)", text)
+    return match.group(1) if match else ""
+
+def parse_count_to_number(text):
+    if not text:
+        return "0"
+    clean_text = text.upper().replace(",", "").replace("(", "").replace(")", "").strip()
+    if 'K' in clean_text:
+        match = re.search(r"(\d+(\.\d+)?)", clean_text)
+        if match:
+            return str(int(float(match.group(1)) * 1000))
+    elif 'M' in clean_text:
+        match = re.search(r"(\d+(\.\d+)?)", clean_text)
+        if match:
+            return str(int(float(match.group(1)) * 1000000))
+    match = re.search(r"(\d+)", clean_text)
+    if match:
+        return match.group(1)
+    return "0"
+
+def extract_data(soup):
+    data = {
+        "Price": "0",
+        "Rating": "0",
+        "Rating_Count": "0"
     }
+
+    # --- PRICE ---
+    raw_price = ""
+    price_selectors = [
+        "#corePriceDisplay_desktop_feature_div .a-offscreen",
+        "#corePrice_feature_div .a-offscreen",
+        "#apex_desktop .a-offscreen",
+        "#priceblock_ourprice",
+        "#priceblock_dealprice",
+        ".a-price.a-text-price.a-size-medium.apexPriceToPay .a-offscreen",
+        ".a-price .a-offscreen"
+    ]
+    for selector in price_selectors:
+        element = soup.select_one(selector)
+        if element and element.get_text(strip=True):
+            raw_price = clean_only_numbers(element.get_text(strip=True))
+            if raw_price:
+                break
+
+    if not raw_price or raw_price == "0":
+        whole_price = soup.select_one(".a-price-whole")
+        if whole_price:
+            raw_price = clean_only_numbers(whole_price.get_text(strip=True))
+
+    if raw_price:
+        if "." in raw_price:
+            data["Price"] = raw_price.split(".")[0]
+        else:
+            data["Price"] = raw_price
+
+    availability = soup.select_one("#availability")
+    if availability and "currently unavailable" in availability.get_text(strip=True).lower():
+        data["Price"] = "0"
+
+    # --- RATING COUNT ---
+    review_tag = soup.find("span", id="acrCustomerReviewText")
+    if review_tag:
+        data["Rating_Count"] = parse_count_to_number(review_tag.get_text(strip=True))
+
+    # --- RATING ---
+    rating_tag = soup.select_one("span[data-hook='rating-out-of-text']")
+    if not rating_tag:
+        rating_tag = soup.select_one(".a-icon-star .a-icon-alt")
+    if rating_tag:
+        data["Rating"] = clean_only_numbers(rating_tag.get_text(strip=True))
+
+    if data["Rating_Count"] == "0":
+        data["Rating"] = "0"
+
+    return data
 
 def is_blocked(html):
     if not html or len(html) < 500:
@@ -44,179 +106,78 @@ def is_blocked(html):
     ])
 
 def is_dead_page(html):
-    """Detect Amazon 404 / dead product pages — no point retrying these."""
     if not html:
         return False
     low = html.lower()
     return any(x in low for x in [
         "looking for something",
         "not a functioning page",
-        "page on our site",
         "dogs of amazon",
-        "we couldn\'t find that page",
-        "the web address you entered is not",
+        "we couldn't find that page",
     ])
 
-def clean_price(text):
-    if not text:
-        return None
-    try:
-        cleaned = re.sub(r"[^\d.]", "", str(text).replace(",", ""))
-        parts = cleaned.split(".")
-        if len(parts) > 2:
-            cleaned = parts[0]
-        val = float(cleaned)
-        return val if 1 <= val <= 500000 else None
-    except Exception:
-        return None
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15",
+]
+
+def get_headers():
+    return {
+        "User-Agent": random.choice(USER_AGENTS),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-IN,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Cache-Control": "no-cache",
+    }
 
 def fetch_with_retry(url, max_attempts=6):
-    """
-    Retry up to max_attempts times with increasing delay.
-    Switches UA every attempt.
-    """
     session = requests.Session()
     for attempt in range(max_attempts):
         try:
-            # Fast first try, then add small delays
             if attempt > 0:
                 time.sleep(random.uniform(0.5, 1.5) * attempt)
-
             session.headers.update(get_headers())
             resp = session.get(url, timeout=12, allow_redirects=True)
-
             if resp.status_code == 404:
                 return None, "Product not found. Check the ASIN."
             if resp.status_code in (503, 429, 403):
-                continue  # retry immediately with new UA
+                continue
             if resp.status_code != 200:
                 continue
-
             html = resp.text
-
-            # Dead product — stop immediately, no point retrying
             if is_dead_page(html):
                 return None, "DEAD_PAGE"
-
             if is_blocked(html):
-                continue  # retry with new UA
-
+                continue
             return html, None
-
-        except requests.exceptions.Timeout:
+        except Exception:
             continue
-        except requests.exceptions.ConnectionError:
-            continue
-        except Exception as e:
-            if attempt == max_attempts - 1:
-                return None, f"Request failed: {str(e)}"
-            continue
-
     return None, "Amazon blocked all attempts. Try again in a moment."
 
-
-def parse(html, asin, domain):
+def scrape(asin, domain):
     try:
-        soup = BeautifulSoup(html, "lxml")
-    except Exception:
+        url = f"https://www.{domain}/dp/{asin}?th=1&psc=1"
+        html, err = fetch_with_retry(url, max_attempts=6)
+        if err == "DEAD_PAGE":
+            return {"error": "Product does not exist on Amazon. The ASIN may be invalid or delisted.", "status": 404, "dead": True}
+        if err:
+            return {"error": err, "status": 422}
+
         soup = BeautifulSoup(html, "html.parser")
+        result = extract_data(soup)
 
-    # ── Title ──────────────────────────────────────────────────
-    title = None
-    try:
-        tag = soup.find("span", {"id": "productTitle"})
-        if tag:
-            title = tag.get_text(strip=True)
-    except Exception:
-        pass
+        title_tag = soup.find("span", {"id": "productTitle"})
+        title = title_tag.get_text(strip=True) if title_tag else None
 
-    # ── Price (sale price only, skip MRP/strikethrough) ────────
-    price = None
-    try:
-        # Method 1: corePriceDisplay block — most reliable
-        core = (
-            soup.find("div", {"id": "corePriceDisplay_desktop_feature_div"}) or
-            soup.find("div", {"id": "corePrice_desktop"}) or
-            soup.find("div", {"id": "apex_desktop"})
-        )
-        if core:
-            for block in core.find_all("span", {"class": "a-price"}):
-                cls = " ".join(block.get("class", []))
-                if any(x in cls for x in ["a-text-strike", "basisPrice", "a-text-price"]):
-                    continue
-                off = block.find("span", {"class": "a-offscreen"})
-                if off:
-                    p = clean_price(off.get_text())
-                    if p:
-                        price = p
-                        break
-
-        # Method 2: any non-MRP price span on page
-        if not price:
-            for block in soup.find_all("span", {"class": "a-price"}):
-                cls = " ".join(block.get("class", []))
-                if any(x in cls for x in ["a-text-strike", "basisPrice", "a-text-price"]):
-                    continue
-                off = block.find("span", {"class": "a-offscreen"})
-                if off:
-                    p = clean_price(off.get_text())
-                    if p:
-                        price = p
-                        break
-
-        # Method 3: whole + fraction
-        if not price:
-            whole = soup.find("span", {"class": "a-price-whole"})
-            frac  = soup.find("span", {"class": "a-price-fraction"})
-            if whole:
-                w = re.sub(r"[^\d]", "", whole.get_text())
-                f = re.sub(r"[^\d]", "", frac.get_text() if frac else "00")
-                try:
-                    price = float(f"{w}.{f}") if w else None
-                except Exception:
-                    pass
-
-        # Method 4: legacy IDs
-        if not price:
-            for pid in ["priceblock_ourprice", "priceblock_dealprice", "priceblock_saleprice"]:
-                tag = soup.find("span", {"id": pid})
-                if tag:
-                    p = clean_price(tag.get_text())
-                    if p:
-                        price = p
-                        break
-
-    except Exception:
-        pass
-
-    # Sanity: if price looks like MRP (too high vs actual), trust nothing
-    # Just return what we found
-    if price and price > 500000:
-        price = None
-
-    # ── Rating ─────────────────────────────────────────────────
-    rating = None
-    try:
-        tag = soup.find("span", {"class": "a-icon-alt"})
-        if tag:
-            m = re.search(r"([\d.]+)\s*out\s*of\s*5", tag.get_text())
-            if m:
-                rating = float(m.group(1))
-        if not rating:
-            tag = soup.find("i", {"class": "a-icon-star"})
-            if tag:
-                m = re.search(r"([\d.]+)", tag.get_text())
-                if m:
-                    rating = float(m.group(1))
-    except Exception:
-        pass
-
-    # ── Availability (simple) ──────────────────────────────────
-    availability = "Unknown"
-    try:
-        avail = soup.find("div", {"id": "availability"})
-        if avail:
-            txt = avail.get_text(strip=True).lower()
+        avail_tag = soup.find("div", {"id": "availability"})
+        availability = "Unknown"
+        if avail_tag:
+            txt = avail_tag.get_text(strip=True).lower()
             if "in stock" in txt:
                 availability = "In Stock"
             elif "only" in txt and "left" in txt:
@@ -224,49 +185,28 @@ def parse(html, asin, domain):
             elif any(x in txt for x in ["out of stock", "unavailable", "not available"]):
                 availability = "Out of Stock"
             else:
-                availability = avail.get_text(strip=True)[:40]
-        elif price:
+                availability = avail_tag.get_text(strip=True)[:40]
+        elif result["Price"] != "0":
             availability = "In Stock"
         else:
             availability = "Out of Stock"
-    except Exception:
-        pass
 
-    return {
-        "asin":         asin,
-        "url":          f"https://www.{domain}/dp/{asin}",
-        "title":        title,
-        "price":        price,
-        "currency":     "INR" if domain == "amazon.in" else "USD",
-        "rating":       rating,
-        "availability": availability,
-        "status":       200,
-    }
-
-
-def scrape(asin, domain):
-    try:
-        url = f"https://www.{domain}/dp/{asin}?th=1&psc=1"
-        html, err = fetch_with_retry(url, max_attempts=6)
-        if err == "DEAD_PAGE":
-            return {
-                "error": "Product does not exist on Amazon. The ASIN may be invalid or delisted.",
-                "status": 404,
-                "dead": True
-            }
-        if err:
-            return {"error": err, "status": 422}
-
-        data = parse(html, asin, domain)
-
-        if not data["title"] and not data["price"]:
+        if not title and result["Price"] == "0":
             return {"error": "Could not extract data. Try again.", "status": 422}
 
-        return data
-
+        return {
+            "asin": asin,
+            "url": f"https://www.{domain}/dp/{asin}",
+            "title": title,
+            "price": float(result["Price"]) if result["Price"] and result["Price"] != "0" else None,
+            "currency": "INR" if domain == "amazon.in" else "USD",
+            "rating": float(result["Rating"]) if result["Rating"] and result["Rating"] != "0" else None,
+            "rating_count": result["Rating_Count"],
+            "availability": availability,
+            "status": 200,
+        }
     except Exception as e:
         return {"error": str(e), "status": 500}
-
 
 def to_json(data):
     try:
@@ -274,9 +214,7 @@ def to_json(data):
     except Exception:
         return b'{"error":"JSON encode failed","status":500}'
 
-
 class handler(BaseHTTPRequestHandler):
-
     def send_json(self, data):
         body = to_json(data)
         self.send_response(200)
@@ -303,7 +241,6 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             self.send_json(scrape(asin, domain))
-
         except Exception as e:
             self.send_json({"error": str(e), "status": 500})
 
