@@ -14,7 +14,8 @@ import requests
 SCRAPER_API_KEY = os.environ.get("SCRAPER_API_KEY", "")
 
 def scraper_api_url(target_url):
-    return f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target_url}&render=true"
+    from urllib.parse import quote
+    return f"https://app.scrapingbee.com/api/v1/?api_key={SCRAPER_API_KEY}&url={quote(target_url)}&render_js=false&premium_proxy=true"
 
 # ---------------------------------------------------------
 # HELPER FUNCTIONS
