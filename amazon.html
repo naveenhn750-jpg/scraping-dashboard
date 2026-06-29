@@ -250,6 +250,7 @@
     <div class="logo-sub">Amazon Product Lookup</div>
   </div>
   <div class="header-right">
+    <span id="serverBadge" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--surface2);border:1px solid var(--border2);color:var(--text3)">⏳ Detecting...</span>
     <select class="domain-sel" id="domain">
       <option value="amazon.in">🇮🇳 amazon.in</option>
       <option value="amazon.com">🇺🇸 amazon.com</option>
@@ -487,7 +488,35 @@
 <footer>Price Scout · Single &amp; Bulk Amazon lookup · Deployed on Vercel</footer>
 
 <script>
-const API = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+// Use local Selenium server if running locally, otherwise use Vercel API
+const LOCAL_API = 'http://localhost:8000';
+const VERCEL_API = '';
+let useLocal = false;
+
+async function detectLocalServer() {
+  try {
+    const res = await fetch(`${LOCAL_API}/api/product?asin=TEST000001&domain=amazon.in`, { signal: AbortSignal.timeout(2000) });
+    useLocal = true;
+    console.log('✅ Local Selenium server detected');
+    showServerBadge(true);
+  } catch {
+    useLocal = false;
+    console.log('ℹ️ Using Vercel API');
+    showServerBadge(false);
+  }
+}
+
+function showServerBadge(isLocal) {
+  const badge = document.getElementById('serverBadge');
+  if (badge) {
+    badge.textContent = isLocal ? '🖥️ Local Server' : '☁️ Vercel API';
+    badge.style.color = isLocal ? '#22c55e' : '#a78bfa';
+  }
+}
+
+const API = { get base() { return useLocal ? LOCAL_API : VERCEL_API; } };
+const getAPI = () => useLocal ? LOCAL_API : VERCEL_API;
+detectLocalServer();
 
 /* ══ Tab switching ══════════════════════════════════════════════════════════ */
 function switchTab(tab) {
@@ -571,7 +600,7 @@ function renderProduct(d) {
 let singleRunning = false;
 
 async function fetchSingle(asin, domain) {
-  const res  = await fetch(`${API}/api/product?asin=${asin}&domain=${domain}`);
+  const res  = await fetch(`${getAPI()}/api/product?asin=${asin}&domain=${domain}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const text = await res.text();
   if (!text || !text.trim()) throw new Error('Empty response');
@@ -736,7 +765,7 @@ function isFailed(r) {
 }
 
 async function fetchOnceRaw(asin, domain) {
-  const res  = await fetch(`${API}/api/product?asin=${asin}&domain=${domain}`);
+  const res  = await fetch(`${getAPI()}/api/product?asin=${asin}&domain=${domain}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const text = await res.text();
   if (!text || !text.trim()) throw new Error('Empty response');
