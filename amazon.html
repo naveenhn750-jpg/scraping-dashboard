@@ -777,33 +777,25 @@ async function fetchOnceRaw(asin, domain) {
 
 // Each ASIN keeps retrying independently until success or maxAttempts
 async function fetchUntilSuccess(asin, domain, idx) {
-  // Retries forever — only stops if product is confirmed dead on Amazon
+  const MAX_ATTEMPTS = 3;
   let attempt = 0;
-  while (true) {
+  while (attempt < MAX_ATTEMPTS) {
     attempt++;
     try {
-      if (attempt > 1) {
-        const base   = attempt <= 5  ? 500 : attempt <= 20 ? 1000 : 2000;
-        const jitter = Math.random() * (attempt <= 5 ? 1000 : attempt <= 20 ? 2000 : 3000);
-        await sleep(base + jitter);
-      }
+      if (attempt > 1) await sleep(1500 * attempt);
       const data = await fetchOnceRaw(asin, domain);
       bulkResults[idx] = data;
       return true;
     } catch(e) {
-      // Dead product — stop immediately, mark as not found
       if (e.dead) {
-        bulkResults[idx] = {
-          asin, error: 'Not found on Amazon (delisted or invalid)',
-          title: null, price: null, rating: null, availability: 'Not Found'
-        };
+        bulkResults[idx] = { asin, error: 'Not found on Amazon', title: null, price: null, rating: null, availability: 'Not Found' };
         return false;
       }
-      // Blocked — keep retrying
-      bulkResults[idx] = {
-        asin, error: `Retrying… (attempt ${attempt})`,
-        title: null, price: null, rating: null, availability: 'Retrying'
-      };
+      if (attempt >= MAX_ATTEMPTS) {
+        bulkResults[idx] = { asin, error: 'Blocked by Amazon', title: null, price: null, rating: null, availability: 'Blocked' };
+        return false;
+      }
+      bulkResults[idx] = { asin, error: `Retrying… (${attempt}/${MAX_ATTEMPTS})`, title: null, price: null, rating: null, availability: 'Retrying' };
     }
   }
 }
