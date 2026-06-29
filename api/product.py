@@ -22,7 +22,7 @@ def fetch_amazon(url):
                 "premium_proxy": "true",
                 "country_code": "in",
             },
-            timeout=55
+            timeout=9
         )
         if resp.status_code == 200:
             html = resp.text
