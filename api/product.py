@@ -22,7 +22,7 @@ def fetch_amazon(url):
                 "premium_proxy": "true",
                 "country_code": "in",
             },
-            timeout=9
+            timeout=8
         )
         if resp.status_code == 200:
             html = resp.text
@@ -166,17 +166,24 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        params = parse_qs(urlparse(self.path).query)
-        asin   = params.get("asin",   [""])[0].strip().upper()
-        domain = params.get("domain", ["amazon.in"])[0].strip()
-        allowed = ["amazon.in", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.co.jp"]
-        if not asin or not re.match(r"^[A-Z0-9]{10}$", asin):
-            self.send_json({"error": "Invalid ASIN.", "status": 400})
-            return
-        if domain not in allowed:
-            self.send_json({"error": "Unsupported domain.", "status": 400})
-            return
-        self.send_json(scrape(asin, domain))
+        try:
+            params = parse_qs(urlparse(self.path).query)
+            asin   = params.get("asin",   [""])[0].strip().upper()
+            domain = params.get("domain", ["amazon.in"])[0].strip()
+            allowed = ["amazon.in", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.co.jp"]
+            if not asin or not re.match(r"^[A-Z0-9]{10}$", asin):
+                self.send_json({"error": "Invalid ASIN.", "status": 400})
+                return
+            if domain not in allowed:
+                self.send_json({"error": "Unsupported domain.", "status": 400})
+                return
+            key_set = bool(SCRAPINGBEE_KEY)
+            result = scrape(asin, domain)
+            result["_key_loaded"] = key_set
+            self.send_json(result)
+        except Exception as e:
+            import traceback
+            self.send_json({"error": str(e), "trace": traceback.format_exc()[-500:], "status": 500})
 
     def do_OPTIONS(self):
         self.send_response(200)

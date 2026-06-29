@@ -12,10 +12,5 @@
     { "src": "/swiggy",   "dest": "/swiggy.html" },
     { "src": "/zepto",    "dest": "/zepto.html" },
     { "src": "/",         "dest": "/index.html" }
-  ],
-  "functions": {
-    "api/product.py": {
-      "maxDuration": 60
-    }
-  }
+  ]
 }
