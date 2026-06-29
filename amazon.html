@@ -612,30 +612,13 @@ async function fetchSingle(asin, domain) {
 }
 
 async function runForever(asin, domain) {
-  // Retries forever until data arrives — stops only if product is confirmed dead
+  const MAX = 3;
   let attempt = 0;
-  while (singleRunning) {
+  while (singleRunning && attempt < MAX) {
     attempt++;
-
-    if (attempt > 1) {
-      const base   = attempt <= 5  ? 600
-                   : attempt <= 15 ? 1200
-                   : 2500;
-      const jitter = Math.random() * (attempt <= 5 ? 800 : attempt <= 15 ? 1500 : 2500);
-      await sleep(base + jitter);
-    }
-
     const msgEl = document.getElementById('attemptMsg');
-    if (attempt === 1) {
-      msgEl.textContent = 'Connecting to Amazon…';
-    } else if (attempt <= 5) {
-      msgEl.textContent = `Blocked — retrying… (attempt ${attempt})`;
-    } else if (attempt <= 15) {
-      msgEl.textContent = `Amazon is blocking — still retrying… (attempt ${attempt})`;
-    } else {
-      msgEl.textContent = `Persistent retry… attempt ${attempt} — please wait`;
-    }
-
+    msgEl.textContent = attempt === 1 ? 'Fetching from Amazon…' : `Retrying… (${attempt}/${MAX})`;
+    if (attempt > 1) await sleep(2000);
     try {
       const data = await fetchSingle(asin, domain);
       if (!singleRunning) return;
@@ -643,13 +626,16 @@ async function runForever(asin, domain) {
       singleRunning = false;
       return;
     } catch(e) {
-      // If product confirmed dead — stop immediately, show error
       if (e.dead) {
         singleRunning = false;
-        showErr(`❌ Product not found — This ASIN does not exist on Amazon or has been delisted.`);
+        showErr('❌ Product not found — This ASIN does not exist on Amazon or has been delisted.');
         return;
       }
-      // Otherwise keep retrying
+      if (attempt >= MAX) {
+        singleRunning = false;
+        showErr(`❌ Failed after ${MAX} attempts. ${e.message}`);
+        return;
+      }
     }
   }
 }
