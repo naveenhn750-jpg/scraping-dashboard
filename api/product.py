@@ -49,7 +49,7 @@ def fetch_with_retry(url, max_attempts=3):
     for attempt in range(max_attempts):
         try:
             if attempt > 0:
-                time.sleep(random.uniform(0.4, 1.2))
+                time.sleep(random.uniform(0.2, 0.5))
             # Fresh session + fresh headers each attempt — avoids fingerprint reuse
             session = requests.Session()
             session.headers.update(get_headers())
