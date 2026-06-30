@@ -44,13 +44,28 @@ def is_dead_page(html):
 
 def fetch_myntra_html(style_id, max_attempts=3):
     url = f"https://www.myntra.com/{style_id}"
+    last_status = None
     for attempt in range(max_attempts):
         try:
             if attempt > 0:
-                time.sleep(random.uniform(0.4, 1.0))
+                time.sleep(random.uniform(0.6, 1.4))
             session = requests.Session()
-            session.headers.update(get_headers())
+            headers = get_headers()
+            session.headers.update(headers)
+
+            # Step 1: hit homepage first to pick up Myntra's session/bot-check cookies
+            try:
+                session.get("https://www.myntra.com/", timeout=6)
+            except Exception:
+                pass
+
+            # Step 2: fetch the actual product page with the session's cookies
+            session.headers.update({
+                "Referer": "https://www.myntra.com/",
+                "Sec-Fetch-Site": "same-origin",
+            })
             resp = session.get(url, timeout=8, allow_redirects=True)
+            last_status = resp.status_code
             if resp.status_code == 404:
                 return None, None, "DEAD_PAGE"
             if resp.status_code in (403, 429, 503):
@@ -59,11 +74,13 @@ def fetch_myntra_html(style_id, max_attempts=3):
                 continue
             html = resp.text
             if is_blocked(html):
+                last_status = "BLOCKED_CONTENT"
                 continue
             return html, resp.url, None
-        except Exception:
+        except Exception as e:
+            last_status = f"EXC:{type(e).__name__}"
             continue
-    return None, None, "Myntra blocked the request. Try again in a moment."
+    return None, None, f"Myntra blocked the request (last status: {last_status}). Try again in a moment."
 
 def extract_embedded_json(html):
     """Myntra embeds product data as window.__myx = {...} in a <script> tag."""
