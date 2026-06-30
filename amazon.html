@@ -771,13 +771,13 @@ async function fetchOnceRaw(asin, domain) {
 
 // Each ASIN keeps retrying independently until success or maxAttempts
 async function fetchUntilSuccess(asin, domain, idx) {
-  const MAX_ATTEMPTS = 3;
+  const MAX_ATTEMPTS = 4;
   let attempt = 0;
   while (attempt < MAX_ATTEMPTS) {
     attempt++;
     try {
       if (attempt > 1) {
-        const backoff = Math.min(600 * attempt, 2000) + Math.random() * 300;
+        const backoff = Math.min(900 * attempt, 3500) + Math.random() * 400;
         await sleep(backoff);
       }
       const data = await fetchOnceRaw(asin, domain);
@@ -833,8 +833,8 @@ async function startBulk() {
 
   // Process in small concurrent batches with human-like pacing
   // to avoid triggering Amazon's bot-burst detection
-  const CONCURRENCY = 20;         // max parallel requests at any time
-  const GAP_MS = 80;               // gap between starting each request in a batch
+  const CONCURRENCY = 10;         // max parallel requests at any time
+  const GAP_MS = 200;               // gap between starting each request in a batch
 
   let allDone = false;
   let doneCount = 0;
@@ -860,26 +860,29 @@ async function startBulk() {
   const workers = Array.from({ length: CONCURRENCY }, () => worker());
   await Promise.all(workers);
 
-  // ── Cleanup pass: retry anything still Blocked, with a cooldown gap ──
-  // Amazon's temp rate-limit usually clears within a few seconds, so a
-  // second slower pass over just the failures recovers most of them.
-  let blockedIdxs = bulkResults
-    .map((r, i) => (r.availability === 'Blocked' ? i : -1))
-    .filter(i => i !== -1);
+  // ── Cleanup passes: retry anything still Blocked, multiple rounds ──
+  // Amazon's temp rate-limit clears over time, so several slower passes
+  // over just the failures recover almost all of them.
+  const MAX_CLEANUP_ROUNDS = 3;
+  for (let round = 1; round <= MAX_CLEANUP_ROUNDS; round++) {
+    let blockedIdxs = bulkResults
+      .map((r, i) => (r.availability === 'Blocked' ? i : -1))
+      .filter(i => i !== -1);
 
-  if (blockedIdxs.length > 0) {
+    if (blockedIdxs.length === 0) break;
+
     document.getElementById('progressCurrent').textContent =
-      `🔁 Retrying ${blockedIdxs.length} blocked ASINs (cooldown pass)…`;
-    await sleep(1500); // let Amazon's rate-limit window reset
+      `🔁 Cooldown pass ${round}/${MAX_CLEANUP_ROUNDS}: retrying ${blockedIdxs.length} blocked ASINs…`;
+    await sleep(2000 * round); // longer cooldown each round
 
-    const CLEANUP_CONCURRENCY = 10;
+    const CLEANUP_CONCURRENCY = 8;
     let cIdx = 0;
     async function cleanupWorker() {
       while (cIdx < blockedIdxs.length) {
         const idx = blockedIdxs[cIdx++];
         const asin = uploadedAsins[idx];
         await fetchUntilSuccess(asin, domain, idx);
-        await sleep(200 + Math.random() * 200);
+        await sleep(300 + Math.random() * 300);
       }
     }
     const cleanupWorkers = Array.from({ length: CLEANUP_CONCURRENCY }, () => cleanupWorker());
