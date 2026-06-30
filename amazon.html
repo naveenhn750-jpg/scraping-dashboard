@@ -771,13 +771,13 @@ async function fetchOnceRaw(asin, domain) {
 
 // Each ASIN keeps retrying independently until success or maxAttempts
 async function fetchUntilSuccess(asin, domain, idx) {
-  const MAX_ATTEMPTS = 6;
+  const MAX_ATTEMPTS = 4;
   let attempt = 0;
   while (attempt < MAX_ATTEMPTS) {
     attempt++;
     try {
       if (attempt > 1) {
-        const backoff = Math.min(2000 * attempt, 12000) + Math.random() * 1000;
+        const backoff = Math.min(800 * attempt, 4000) + Math.random() * 500;
         await sleep(backoff);
       }
       const data = await fetchOnceRaw(asin, domain);
@@ -833,8 +833,8 @@ async function startBulk() {
 
   // Process in small concurrent batches with human-like pacing
   // to avoid triggering Amazon's bot-burst detection
-  const CONCURRENCY = 3;          // max parallel requests at any time
-  const GAP_MS = 900;             // gap between starting each request in a batch
+  const CONCURRENCY = 6;          // max parallel requests at any time
+  const GAP_MS = 350;              // gap between starting each request in a batch
 
   let allDone = false;
   let doneCount = 0;
