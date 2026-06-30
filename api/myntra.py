@@ -31,54 +31,27 @@ def get_headers():
     }
 
 def is_blocked(html):
-    if not html or len(html) < 1000:
+    if not html or len(html) < 500:
         return True
     low = html.lower()
-    return any(x in low for x in ["captcha", "access denied", "are you a human", "automated access"])
+    return any(x in low for x in [
+        "captcha", "access denied", "are you a human", "automated access",
+        "unusual traffic", "ak_bmsc", "px-captcha", "perimeterx",
+    ])
+
+def has_product_data(html):
+    """Check if the page actually contains product info, not just an empty SPA shell."""
+    if not html:
+        return False
+    low = html.lower()
+    return ("__myx" in low or "pdpdata" in low or "productname" in low
+            or "discounted" in low or "og:title" in low)
 
 def is_dead_page(html):
     if not html:
         return False
     low = html.lower()
     return any(x in low for x in ["page not found", "404", "we are unable to find"]) and "pdpdata" not in low and "__myx" not in low
-
-import os
-
-SCRAPINGBEE_KEY = os.environ.get("SCRAPER_API_KEY", "")
-
-def fetch_via_scrapingbee(url):
-    """Fallback proxy fetch with JS rendering — used when direct request is blocked."""
-    if not SCRAPINGBEE_KEY:
-        return None, None, "Proxy not configured."
-    try:
-        resp = requests.get(
-            "https://app.scrapingbee.com/api/v1/",
-            params={
-                "api_key": SCRAPINGBEE_KEY,
-                "url": url,
-                "render_js": "true",
-                "premium_proxy": "true",
-                "country_code": "in",
-                "wait": "2000",
-            },
-            timeout=55,
-        )
-        if resp.status_code == 200:
-            html = resp.text
-            if is_blocked(html):
-                return None, None, "BLOCKED_CONTENT (proxy)"
-            final_url = resp.headers.get("Spb-Resolved-Url") or url
-            return html, final_url, None
-        elif resp.status_code == 401:
-            return None, None, "Invalid proxy API key."
-        elif resp.status_code == 403:
-            return None, None, "Proxy quota exceeded."
-        else:
-            return None, None, f"Proxy error: {resp.status_code}"
-    except requests.exceptions.Timeout:
-        return None, None, "Proxy request timed out."
-    except Exception as e:
-        return None, None, f"Proxy error: {str(e)}"
 
 def fetch_myntra_html(style_id, max_attempts=3):
     url = f"https://www.myntra.com/{style_id}"
@@ -114,18 +87,14 @@ def fetch_myntra_html(style_id, max_attempts=3):
             if is_blocked(html):
                 last_status = "BLOCKED_CONTENT"
                 continue
+            if not has_product_data(html):
+                last_status = "NO_PRODUCT_DATA"
+                continue
             return html, resp.url, None
         except Exception as e:
             last_status = f"EXC:{type(e).__name__}"
             continue
-    # Direct attempts failed — fall back to proxy with JS rendering (Myntra is a heavy SPA)
-    if SCRAPINGBEE_KEY:
-        html, resolved_url, perr = fetch_via_scrapingbee(url)
-        if html and not perr:
-            return html, resolved_url, None
-        return None, None, f"Myntra blocked direct request; proxy also failed: {perr}"
-
-    return None, None, f"Myntra blocked the request (last status: {last_status}, no proxy key set). Try again in a moment."
+    return None, None, f"Myntra blocked the request (last status: {last_status}). Try again in a moment."
 
 def extract_embedded_json(html):
     """Myntra embeds product data as window.__myx = {...} in a <script> tag."""
