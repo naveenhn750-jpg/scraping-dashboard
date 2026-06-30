@@ -3,253 +3,1058 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Myntra Scout</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <title>Myntra Price Scout</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <!-- SheetJS for reading Excel/CSV uploads and writing Excel reports -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --accent: #ff3f6c;
-      --bg: #0a0c10; --surface: #111318; --surface2: #181b23; --surface3: #1f2230;
-      --border: #252836; --border2: #2e3245;
-      --text: #eef0f8; --text2: #8b91b5; --text3: #4a5070;
-      --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
-      --r: 16px; --rs: 10px;
+      --bg:      #0d0f14; --surface: #151820; --surface2: #1c1f2b;
+      --surface3: #232737; --border: #2a2e40; --border2: #353a52;
+      --accent:  #f5a623; --accent2: #e8951a;
+      --green:   #22c55e; --red: #ef4444; --yellow: #eab308;
+      --text:    #f0f2f8; --text2: #9ca3c4; --text3: #5c6285;
+      --mono:    'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
+      --r: 12px; --rs: 7px;
     }
-    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; display: flex; flex-direction: column; }
 
-    header {
-      padding: 1.1rem 2rem; border-bottom: 1px solid var(--border);
-      background: var(--surface);
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .brand { display: flex; align-items: center; gap: 10px; }
-    .brand-icon {
-      width: 36px; height: 36px; border-radius: 10px; font-size: 18px;
-      background: color-mix(in srgb, var(--accent) 15%, transparent);
-      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-      display: grid; place-items: center;
-    }
-    .brand-name { font-size: 15px; font-weight: 700; }
-    .brand-sub  { font-size: 11px; color: var(--text3); margin-top: 1px; }
-    .back-btn {
-      display: flex; align-items: center; gap: 6px;
-      background: var(--surface2); border: 1px solid var(--border2);
-      color: var(--text2); font-size: 12px; font-weight: 600;
-      padding: 7px 14px; border-radius: var(--rs); cursor: pointer;
-      text-decoration: none; transition: background 0.12s, color 0.12s;
-    }
-    .back-btn:hover { background: var(--surface3); color: var(--text); }
+    /* ── Header ── */
+    header { padding: 1rem 2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; background: var(--surface); }
+    .logo { width: 34px; height: 34px; background: var(--accent); border-radius: 8px; display: grid; place-items: center; font-size: 16px; }
+    .logo-text { font-size: 16px; font-weight: 700; }
+    .logo-sub  { font-size: 11px; color: var(--text3); margin-top: 1px; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .domain-sel { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); font-family: var(--mono); font-size: 12px; padding: 6px 10px; border-radius: var(--rs); outline: none; cursor: pointer; }
+    .domain-sel:focus { border-color: var(--accent); }
 
-    .page { max-width: 900px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
-    .hero { text-align: center; margin-bottom: 2.5rem; }
-    .hero-icon {
-      width: 72px; height: 72px; border-radius: 20px; font-size: 36px;
-      background: color-mix(in srgb, var(--accent) 12%, transparent);
-      border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
-      display: grid; place-items: center; margin: 0 auto 1rem;
-    }
-    .hero h1 { font-size: 32px; font-weight: 800; margin-bottom: 6px; }
-    .hero h1 span { color: var(--accent); }
-    .hero p { color: var(--text3); font-size: 14px; }
+    /* ── Tabs ── */
+    main { flex: 1; max-width: 900px; margin: 0 auto; width: 100%; padding: 2rem 1.5rem 4rem; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 1.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 4px; }
+    .tab { flex: 1; text-align: center; padding: 8px 16px; border-radius: 9px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text3); transition: all 0.15s; border: none; background: none; }
+    .tab.active { background: var(--surface3); color: var(--text); border: 1px solid var(--border2); }
+    .tab:hover:not(.active) { color: var(--text2); }
+    .panel { display: none; }
+    .panel.active { display: block; }
 
-    /* Tabs */
-    .tabs {
-      display: flex; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; padding: 4px; margin-bottom: 1.5rem; gap: 4px;
-    }
-    .tab {
-      flex: 1; text-align: center; padding: 10px; border-radius: 9px;
-      font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text3);
-      transition: background 0.15s, color 0.15s; border: none; background: none;
-    }
-    .tab.active { background: var(--surface2); color: var(--text); }
+    /* ── Single lookup ── */
+    .hero { text-align: center; margin-bottom: 2rem; }
+    .hero h2 { font-size: 26px; font-weight: 700; }
+    .hero h2 span { color: var(--accent); }
+    .hero p { color: var(--text2); font-size: 13px; margin-top: 6px; }
 
-    /* Search box */
-    .search-card {
-      background: var(--surface); border: 1.5px solid var(--border);
-      border-radius: var(--r); padding: 1.5rem;
-    }
-    .search-row { display: flex; gap: 8px; margin-bottom: 10px; }
-    .search-input {
-      flex: 1; background: var(--surface2); border: 1.5px solid var(--border2);
-      border-radius: var(--rs); color: var(--text);
-      font-family: var(--mono); font-size: 14px; padding: 12px 16px;
-      outline: none; transition: border-color 0.15s;
-    }
+    .search-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1.1rem; margin-bottom: 1.25rem; }
+    .search-row { display: flex; gap: 8px; }
+    .search-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--rs); color: var(--text); font-family: var(--mono); font-size: 15px; padding: 11px 14px; letter-spacing: 0.06em; outline: none; transition: border-color 0.15s; }
     .search-input::placeholder { color: var(--text3); }
     .search-input:focus { border-color: var(--accent); }
-    .fetch-btn {
-      background: var(--accent); border: none; border-radius: var(--rs);
-      color: #fff; font-family: var(--sans); font-size: 13px; font-weight: 700;
-      padding: 12px 22px; cursor: pointer; white-space: nowrap;
-      transition: opacity 0.12s; letter-spacing: 0.02em;
-    }
-    .fetch-btn:hover { opacity: 0.85; }
+    .fetch-btn { background: var(--accent); border: none; border-radius: var(--rs); color: #0d0f14; font-family: var(--sans); font-size: 13px; font-weight: 700; padding: 11px 20px; cursor: pointer; white-space: nowrap; transition: background 0.12s, transform 0.1s; display: flex; align-items: center; gap: 6px; }
+    .fetch-btn:hover { background: var(--accent2); }
+    .fetch-btn:active { transform: scale(0.97); }
+    .fetch-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+    .chip-label { font-size: 11px; color: var(--text3); }
+    .chip { font-family: var(--mono); font-size: 11px; padding: 3px 9px; border: 1px solid var(--border2); border-radius: 999px; cursor: pointer; color: var(--text2); background: var(--surface2); transition: border-color 0.1s, color 0.1s; }
+    .chip:hover { border-color: var(--accent); color: var(--accent); }
 
-    /* Bulk upload */
-    .bulk-section { display: none; }
-    .bulk-section.show { display: block; }
-    .single-section { display: block; }
-    .single-section.hide { display: none; }
+    .loader { display: none; flex-direction: column; align-items: center; gap: 12px; padding: 2.5rem 0; }
+    .loader.show { display: flex; }
+    .ring { width: 38px; height: 38px; border: 3px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-msg { color: var(--text2); font-size: 13px; }
+    .loader-attempt { color: var(--text3); font-size: 11px; font-family: var(--mono); }
 
+    .error-box { display: none; background: #1e1212; border: 1px solid #5a1d1d; border-radius: var(--r); padding: 0.9rem 1.1rem; color: var(--red); font-size: 13px; gap: 8px; align-items: center; margin-bottom: 1rem; }
+    .error-box.show { display: flex; }
+
+    .result { display: none; }
+    .result.show { display: block; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1.5rem; }
+
+    .badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 3px 10px; border-radius: 4px; margin-bottom: 12px; }
+    .badge-in  { background: #0f2e1a; color: var(--green);  border: 1px solid #1a4d2a; }
+    .badge-out { background: #2e0f0f; color: var(--red);    border: 1px solid #4d1a1a; }
+    .badge-low { background: #2e2310; color: var(--yellow); border: 1px solid #4d3a18; }
+    .badge-unk { background: var(--surface2); color: var(--text3); border: 1px solid var(--border); }
+
+    .product-title { font-size: 15px; font-weight: 600; line-height: 1.45; color: var(--text); margin-bottom: 1.25rem; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+    .stat { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--rs); padding: 0.85rem 1rem; }
+    .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); margin-bottom: 5px; }
+    .stat-value { font-size: 22px; font-weight: 700; color: var(--text); font-family: var(--mono); }
+    .stat-value.price-val { color: var(--accent); }
+    .stat-value.rating-val { color: var(--yellow); font-size: 16px; }
+    .stat-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+    .card-footer { border-top: 1px solid var(--border); padding-top: 0.9rem; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .asin-mono { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+    .asin-mono span { color: var(--text2); }
+    .footer-btns { display: flex; gap: 8px; }
+    .btn-sec { background: var(--surface3); border: 1px solid var(--border2); color: var(--text2); font-size: 11px; font-weight: 500; padding: 6px 12px; border-radius: var(--rs); cursor: pointer; transition: background 0.1s; display: flex; align-items: center; gap: 5px; }
+    .btn-sec:hover { background: var(--border2); color: var(--text); }
+    .btn-amz { background: var(--accent); border: none; color: #0d0f14; font-size: 11px; font-weight: 700; padding: 6px 14px; border-radius: var(--rs); cursor: pointer; }
+    .btn-amz:hover { background: var(--accent2); }
+    .history { margin-top: 1.25rem; }
+    .section-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .history-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--rs); padding: 0.75rem 1rem; font-size: 12px; color: var(--text3); line-height: 1.8; font-family: var(--mono); white-space: pre-wrap; }
+
+    /* ── Bulk upload panel ── */
     .upload-zone {
       border: 2px dashed var(--border2); border-radius: var(--r);
-      padding: 2.5rem; text-align: center; cursor: pointer;
-      transition: border-color 0.15s, background 0.15s; margin-bottom: 1rem;
+      padding: 3rem 2rem; text-align: center; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      background: var(--surface); margin-bottom: 1.25rem;
     }
-    .upload-zone:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); }
-    .upload-icon { font-size: 36px; margin-bottom: 10px; }
-    .upload-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: #1a1c25; }
+    .upload-zone input { display: none; }
+    .upload-icon { font-size: 40px; margin-bottom: 12px; }
+    .upload-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
     .upload-sub { font-size: 12px; color: var(--text3); }
-    .upload-input { display: none; }
+    .upload-sub span { color: var(--accent); text-decoration: underline; cursor: pointer; }
 
-    /* Format guide */
+    .file-info { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1rem 1.25rem; margin-bottom: 1rem; display: none; align-items: center; gap: 12px; }
+    .file-info.show { display: flex; }
+    .file-icon { font-size: 24px; }
+    .file-details { flex: 1; }
+    .file-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .file-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+    .file-clear { background: none; border: 1px solid var(--border2); color: var(--text3); font-size: 11px; padding: 4px 10px; border-radius: var(--rs); cursor: pointer; }
+    .file-clear:hover { color: var(--red); border-color: var(--red); }
+
+    .bulk-btn { background: var(--accent); border: none; border-radius: var(--rs); color: #0d0f14; font-family: var(--sans); font-size: 14px; font-weight: 700; padding: 12px 24px; cursor: pointer; width: 100%; transition: background 0.12s; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 1.25rem; }
+    .bulk-btn:hover { background: var(--accent2); }
+    .bulk-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* Progress */
+    .progress-wrap { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1.25rem; margin-bottom: 1.25rem; }
+    .progress-wrap.show { display: block; }
+    .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .progress-label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .progress-count { font-size: 12px; color: var(--text2); font-family: var(--mono); }
+    .progress-bar-bg { background: var(--surface3); border-radius: 999px; height: 6px; overflow: hidden; margin-bottom: 10px; }
+    .progress-bar { height: 100%; background: var(--accent); border-radius: 999px; width: 0%; transition: width 0.3s; }
+    .progress-current { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+
+    /* Results table */
+    .bulk-results { display: none; }
+    .bulk-results.show { display: block; }
+    .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
+    .results-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .results-meta { font-size: 12px; color: var(--text3); }
+    .download-btns { display: flex; gap: 8px; }
+    .dl-btn { padding: 7px 14px; border-radius: var(--rs); font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; border: none; transition: background 0.12s; }
+    .dl-csv { background: var(--surface3); border: 1px solid var(--border2); color: var(--text2); }
+    .dl-csv:hover { background: var(--border2); color: var(--text); }
+    .dl-xlsx { background: var(--accent); color: #0d0f14; }
+    .dl-xlsx:hover { background: var(--accent2); }
+
+    .more-note { font-size: 11px; color: var(--text3); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--rs); padding: 8px 12px; margin-bottom: 12px; display: none; }
+    .more-note.show { display: block; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead th { background: var(--surface2); color: var(--text3); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td { padding: 10px 12px; color: var(--text2); vertical-align: middle; }
+    tbody td.asin-cell { font-family: var(--mono); color: var(--text); font-size: 11px; }
+    tbody td.title-cell { color: var(--text); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    tbody td.price-cell { color: var(--accent); font-family: var(--mono); font-weight: 600; }
+    tbody td.rating-cell { color: var(--yellow); }
+    .tbl-badge { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; border-radius: 3px; }
+    .tbl-in  { background: #0f2e1a; color: var(--green);  }
+    .tbl-out { background: #2e0f0f; color: var(--red);    }
+    .tbl-low { background: #2e2310; color: var(--yellow); }
+    .tbl-unk { background: var(--surface3); color: var(--text3); }
+    .tbl-err      { background: #2e1a0f; color: #e8782a; }
+    .tbl-retrying { background: #1a1a2e; color: #7c8bff; animation: pulse 1.2s ease-in-out infinite; }
+    .tbl-notfound { background: #2a1f0a; color: #c97b2a; border: 1px solid #5a3a0a; }
+    .tbl-pending  { background: var(--surface3); color: var(--text3); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+    .table-wrap { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; overflow-x: auto; }
+
+    footer { padding: 1rem 2rem; border-top: 1px solid var(--border); text-align: center; font-size: 11px; color: var(--text3); }
+
+    @media (max-width: 600px) {
+      .stats { grid-template-columns: 1fr 1fr; }
+      main { padding: 1.5rem 1rem 3rem; }
+      header { padding: 1rem; }
+    }
+
+    /* ── File format guide ── */
     .format-guide {
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: var(--rs); padding: 1rem 1.2rem; margin-bottom: 1rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); margin-bottom: 1.25rem; overflow: hidden;
     }
-    .format-title { font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
-    .format-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text3); margin-bottom: 4px; }
-    .format-row span { font-size: 14px; }
+    .format-guide-title {
+      padding: 0.75rem 1.1rem; font-size: 13px; font-weight: 600;
+      color: var(--text2); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface2);
+    }
+    .format-guide-body {
+      padding: 1.1rem; display: grid;
+      grid-template-columns: 1fr 1fr; gap: 1.25rem;
+    }
+    @media (max-width: 640px) { .format-guide-body { grid-template-columns: 1fr; } }
+    .format-rules { display: flex; flex-direction: column; gap: 9px; }
+    .format-rule {
+      display: flex; align-items: flex-start; gap: 8px;
+      font-size: 12px; color: var(--text2); line-height: 1.5;
+    }
+    .rule-icon {
+      flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%;
+      display: grid; place-items: center; font-size: 10px; font-weight: 700; margin-top: 1px;
+    }
+    .rule-ok  { background: #0f2e1a; color: var(--green); border: 1px solid #1a4d2a; }
+    .rule-no  { background: #2e0f0f; color: var(--red);   border: 1px solid #4d1a1a; }
+    .format-rule code {
+      font-family: var(--mono); font-size: 11px; background: var(--surface3);
+      padding: 1px 6px; border-radius: 4px; color: var(--accent);
+      border: 1px solid var(--border2);
+    }
+    /* Spreadsheet preview */
+    .format-preview { font-size: 11px; }
+    .preview-label { font-size: 11px; font-weight: 600; color: var(--text2); margin-bottom: 6px; }
+    .preview-sheet {
+      border: 1px solid var(--border2); border-radius: 6px; overflow: hidden;
+      background: var(--surface2);
+    }
+    .preview-wrong { opacity: 0.8; }
+    .sheet-header, .sheet-row {
+      display: flex; border-bottom: 1px solid var(--border);
+    }
+    .sheet-row:last-child { border-bottom: none; }
+    .sheet-more { opacity: 0.4; }
+    .sheet-cell {
+      padding: 5px 8px; font-family: var(--mono);
+      font-size: 10px; border-right: 1px solid var(--border);
+    }
+    .sheet-cell:last-child { border-right: none; }
+    .sheet-col-a { min-width: 110px; }
+    .sheet-col-b { flex: 1; }
+    .header-cell  { font-weight: 700; background: var(--surface3); color: var(--text2); font-family: var(--sans); font-size: 10px; }
+    .asin-cell-pre { color: var(--accent); }
+    .other-cell   { color: var(--text3); font-family: var(--sans); }
+    .wrong-header { color: var(--red) !important; }
+    .wrong-cell   { color: var(--red); opacity: 0.7; }
 
-    /* Coming soon overlay for bulk */
-    .coming-panel {
-      text-align: center; padding: 2rem;
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: var(--r);
-    }
-    .coming-panel h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
-    .coming-panel p { font-size: 13px; color: var(--text3); }
-    .coming-tag {
-      display: inline-block; margin-top: 12px;
-      font-size: 11px; font-weight: 600; padding: 4px 12px;
-      border-radius: 999px;
-      background: color-mix(in srgb, var(--accent) 12%, transparent);
-      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-      color: var(--accent);
-    }
-
-    /* Result */
-    .result { display: none; margin-top: 1rem; }
-    .result.show { display: block; }
-    .loader { display: none; text-align: center; padding: 2rem; }
-    .loader.show { display: block; }
-    .ring {
-      width: 36px; height: 36px; margin: 0 auto 10px;
-      border: 3px solid var(--border2); border-top-color: var(--accent);
-      border-radius: 50%; animation: spin 0.7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .error-box {
-      display: none; background: #1e1212; border: 1px solid #5a1d1d;
-      border-radius: var(--rs); padding: 0.8rem 1rem;
-      color: #ef4444; font-size: 13px; margin-top: 1rem;
-    }
-    .error-box.show { display: block; }
-    .rcard {
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: var(--rs); padding: 1.25rem;
-    }
-    .badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 3px 10px; border-radius: 4px; margin-bottom: 10px; }
-    .badge-in  { background: #0f2e1a; color: #22c55e; border: 1px solid #1a4d2a; }
-    .badge-out { background: #2e0f0f; color: #ef4444; border: 1px solid #4d1a1a; }
-    .badge-unk { background: var(--surface3); color: var(--text3); border: 1px solid var(--border); }
-    .product-title { font-size: 15px; font-weight: 600; line-height: 1.5; margin-bottom: 1rem; }
-    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1rem; }
-    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--rs); padding: 0.75rem 0.9rem; }
-    .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); margin-bottom: 4px; }
-    .stat-value { font-size: 20px; font-weight: 700; font-family: var(--mono); color: var(--accent); }
-    .stat-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
-    .card-footer { border-top: 1px solid var(--border); padding-top: 0.8rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-    .id-mono { font-family: var(--mono); font-size: 11px; color: var(--text3); }
-    .id-mono span { color: var(--text2); }
-    .btn-sec { background: var(--surface3); border: 1px solid var(--border2); color: var(--text2); font-size: 11px; font-weight: 500; padding: 5px 10px; border-radius: var(--rs); cursor: pointer; }
-    .btn-sec:hover { background: var(--border2); color: var(--text); }
-    .btn-primary { background: var(--accent); border: none; color: #fff; font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: var(--rs); cursor: pointer; text-decoration: none; display: inline-block; }
   </style>
 </head>
 <body>
 
 <header>
-  <div class="brand">
-    <div class="brand-icon">👗</div>
-    <div>
-      <div class="brand-name">Myntra Scout</div>
-      <div class="brand-sub">Fashion Lookup</div>
-    </div>
+  <div class="logo">👗</div>
+  <div>
+    <div class="logo-text">Price Scout</div>
+    <div class="logo-sub">Myntra Product Lookup</div>
   </div>
-  <a href="/" class="back-btn">← Dashboard</a>
+  <div class="header-right">
+    <a href="/" style="font-size:12px;font-weight:600;color:var(--text2);text-decoration:none;background:var(--surface2);border:1px solid var(--border2);padding:6px 12px;border-radius:8px;margin-right:8px;">← Dashboard</a>
+    <span id="serverBadge" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--surface2);border:1px solid var(--border2);color:var(--text3)">⏳ Detecting...</span>
+    
+  </div>
 </header>
 
-<div class="page">
-  <div class="hero">
-    <div class="hero-icon">👗</div>
-    <h1>Myntra <span>Price Scout</span></h1>
-    <p>Search fashion by product ID</p>
-  </div>
-
+<main>
+  <!-- Tabs -->
   <div class="tabs">
-    <button class="tab active" onclick="switchTab('single', this)">Single Lookup</button>
-    <button class="tab" onclick="switchTab('bulk', this)">Bulk Upload (Excel / CSV)</button>
+    <button class="tab active" onclick="switchTab('single')">Single Style ID Lookup</button>
+    <button class="tab" onclick="switchTab('bulk')">Bulk Upload (Excel / CSV)</button>
   </div>
 
-  <div class="search-card">
-    <!-- Single -->
-    <div class="single-section" id="singleSection">
+  <!-- ══ SINGLE PANEL ══════════════════════════════════════════ -->
+  <div class="panel active" id="panel-single">
+    <div class="hero">
+      <h2>Myntra <span>Price Scout</span></h2>
+      <p>Enter a Style ID to get live title, price & rating</p>
+    </div>
+
+    <div class="search-box">
       <div class="search-row">
-        <input class="search-input" id="idInput" placeholder="Enter Myntra Product ID / SKU" onkeydown="if(event.key==='Enter')doFetch()"/>
-        <button class="fetch-btn" id="fetchBtn" onclick="doFetch()">Fetch</button>
+        <input class="search-input" id="asin" type="text" placeholder="e.g. 33927297" maxlength="12" autocomplete="off" spellcheck="false"/>
+        <button class="fetch-btn" id="fetchBtn" onclick="run()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Fetch
+        </button>
       </div>
-      <div style="font-size:12px;color:var(--text3)">Enter a valid Myntra product ID to fetch live price, rating & availability</div>
-      <div class="loader" id="loader"><div class="ring"></div><div style="color:var(--text2);font-size:13px">Fetching from Myntra…</div></div>
-      <div class="error-box" id="errBox"></div>
-      <div class="result" id="result"></div>
+      <div class="chips">
+        <span class="chip-label">Try:</span>
+        <span class="chip" onclick="go('33927297')">33927297</span>
+        <span class="chip" onclick="go('28461029')">28461029</span>
+        <span class="chip" onclick="go('19283746')">19283746</span>
+      </div>
     </div>
 
-    <!-- Bulk -->
-    <div class="bulk-section" id="bulkSection">
-      <div class="coming-panel">
-        <div style="font-size:40px;margin-bottom:12px">👗</div>
-        <h3>Bulk Upload for Myntra</h3>
-        <p>Upload an Excel or CSV file with multiple product IDs and fetch them all in parallel.</p>
-        <div class="coming-tag">🚧 Coming Soon</div>
+    <div class="error-box" id="errBox"><span>⚠️</span><span id="errMsg"></span></div>
+
+    <div class="loader" id="loader">
+      <div class="ring"></div>
+      <div class="loader-msg">Fetching from Amazon…</div>
+      <div class="loader-attempt" id="attemptMsg">Connecting…</div>
+    </div>
+
+    <div class="result" id="result">
+      <div class="card">
+        <div id="badge" class="badge badge-unk">Unknown</div>
+        <div class="product-title" id="title">—</div>
+        <div class="stats" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="stat">
+            <div class="stat-label">Current Price</div>
+            <div class="stat-value price-val" id="price">—</div>
+            <div class="stat-sub" id="currency">INR</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Rating</div>
+            <div class="stat-value rating-val" id="rating">—</div>
+            <div class="stat-sub" id="ratingCountSub">out of 5</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Reviews</div>
+            <div class="stat-value" id="ratingCount" style="color:var(--text2)">—</div>
+            <div class="stat-sub">total ratings</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Last Fetched</div>
+            <div class="stat-value" style="font-size:13px;color:var(--text2);" id="fetchedAt">—</div>
+            <div class="stat-sub" id="fetchedDate">—</div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="asin-mono">Style ID: <span id="asinDisplay">—</span></div>
+          <div class="footer-btns">
+            <button class="btn-sec" onclick="copyAsin()">Copy Style ID</button>
+            <button class="btn-sec" onclick="run()">↻ Refresh</button>
+            <button class="btn-amz" onclick="openAmz()">View on Myntra ↗</button>
+          </div>
+        </div>
+      </div>
+      <div class="history">
+        <div class="section-title">Price History</div>
+        <div class="history-box" id="historyBox">No history yet for this Style ID.</div>
       </div>
     </div>
   </div>
-</div>
+
+  <!-- ══ BULK PANEL ════════════════════════════════════════════ -->
+  <div class="panel" id="panel-bulk">
+    <div class="hero">
+      <h2>Bulk <span>Style ID Lookup</span></h2>
+      <p>Upload an Excel or CSV file — we'll fetch all products in parallel and generate a full report</p>
+    </div>
+
+    <!-- File format guide -->
+    <div class="format-guide">
+      <div class="format-guide-title">
+        <span>📋</span> How to format your file
+      </div>
+      <div class="format-guide-body">
+        <div class="format-rules">
+          <div class="format-rule">
+            <span class="rule-icon rule-ok">✓</span>
+            <span>Column header must be exactly <code>STYLE_ID</code></span>
+          </div>
+          <div class="format-rule">
+            <span class="rule-icon rule-ok">✓</span>
+            <span>All Style IDs must be in a <strong>single column</strong> — one per row</span>
+          </div>
+          <div class="format-rule">
+            <span class="rule-icon rule-ok">✓</span>
+            <span>Each Style ID is numeric (4-12 digits)</span>
+          </div>
+          <div class="format-rule">
+            <span class="rule-icon rule-ok">✓</span>
+            <span>Accepts <strong>.xlsx</strong>, <strong>.xls</strong>, and <strong>.csv</strong> files</span>
+          </div>
+          <div class="format-rule">
+            <span class="rule-icon rule-no">✗</span>
+            <span>Do NOT split Style IDs across multiple columns</span>
+          </div>
+        </div>
+
+        <!-- Visual preview of correct format -->
+        <div class="format-preview">
+          <div class="preview-label">✅ Correct format</div>
+          <div class="preview-sheet">
+            <div class="sheet-header">
+              <div class="sheet-cell sheet-col-a header-cell">STYLE_ID</div>
+              <div class="sheet-cell sheet-col-b other-cell">Other columns OK</div>
+            </div>
+            <div class="sheet-row">
+              <div class="sheet-cell sheet-col-a asin-cell-pre">33927297</div>
+              <div class="sheet-cell sheet-col-b other-cell">Product name…</div>
+            </div>
+            <div class="sheet-row">
+              <div class="sheet-cell sheet-col-a asin-cell-pre">28461029</div>
+              <div class="sheet-cell sheet-col-b other-cell">Category…</div>
+            </div>
+            <div class="sheet-row">
+              <div class="sheet-cell sheet-col-a asin-cell-pre">19283746</div>
+              <div class="sheet-cell sheet-col-b other-cell">Brand…</div>
+            </div>
+            <div class="sheet-row sheet-more">
+              <div class="sheet-cell sheet-col-a" style="color:var(--text3)">…</div>
+              <div class="sheet-cell sheet-col-b" style="color:var(--text3)">…</div>
+            </div>
+          </div>
+
+          <div class="preview-label" style="margin-top:12px; color:var(--red)">❌ Wrong format</div>
+          <div class="preview-sheet preview-wrong">
+            <div class="sheet-header">
+              <div class="sheet-cell sheet-col-a header-cell wrong-header">style_id</div>
+              <div class="sheet-cell sheet-col-b header-cell wrong-header">STYLE_ID 2</div>
+              <div class="sheet-cell sheet-col-b header-cell wrong-header">STYLE_ID 3</div>
+            </div>
+            <div class="sheet-row">
+              <div class="sheet-cell sheet-col-a wrong-cell">B0FY66N9RX</div>
+              <div class="sheet-cell sheet-col-b wrong-cell">B0DGXWJLX4</div>
+              <div class="sheet-cell sheet-col-b wrong-cell">B09G9FPHY6</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drop zone -->
+    <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="handleDrop(event)">
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFile(this.files[0])"/>
+      <div class="upload-icon">📂</div>
+      <div class="upload-title">Drop your file here or <span>browse</span></div>
+      <div class="upload-sub">Supports .xlsx, .xls, .csv &nbsp;·&nbsp; Column must be named <strong>STYLE_ID</strong></div>
+    </div>
+
+    <!-- File info -->
+    <div class="file-info" id="fileInfo">
+      <div class="file-icon" id="fileIcon">📊</div>
+      <div class="file-details">
+        <div class="file-name" id="fileName">—</div>
+        <div class="file-meta" id="fileMeta">—</div>
+      </div>
+      <button class="file-clear" onclick="clearFile()">✕ Clear</button>
+    </div>
+
+    <button class="bulk-btn" id="bulkBtn" onclick="startBulk()" disabled>
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Fetch All Style IDs
+    </button>
+
+    <!-- Progress -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-header">
+        <div class="progress-label" id="progressLabel">Fetching products…</div>
+        <div class="progress-count" id="progressCount">0 / 0</div>
+      </div>
+      <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="progress-current" id="progressCurrent">Starting…</div>
+    </div>
+
+    <!-- Results table -->
+    <div class="bulk-results" id="bulkResults">
+      <div class="results-header">
+        <div>
+          <div class="results-title" id="resultsTitle">Results</div>
+          <div class="results-meta" id="resultsMeta"></div>
+        </div>
+        <div class="download-btns">
+          <button class="dl-btn dl-csv" onclick="downloadCSV()">⬇ Download CSV</button>
+          <button class="dl-btn dl-xlsx" onclick="downloadXLSX()">⬇ Download Excel</button>
+        </div>
+      </div>
+      <div class="more-note" id="moreNote">
+        📋 Showing first 10 results on screen. Download the report to see all data.
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Style ID</th>
+              <th>Title</th>
+              <th>Price</th>
+              <th>Rating</th>
+              <th>Reviews</th>
+              <th>Availability</th>
+            </tr>
+          </thead>
+          <tbody id="bulkTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>Price Scout · Single &amp; Bulk Amazon lookup · Deployed on Vercel</footer>
 
 <script>
-  function switchTab(tab, el) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-    if (tab === 'single') {
-      document.getElementById('singleSection').classList.remove('hide');
-      document.getElementById('bulkSection').classList.remove('show');
-    } else {
-      document.getElementById('singleSection').classList.add('hide');
-      document.getElementById('bulkSection').classList.add('show');
+// Use local Selenium server if running locally, otherwise use Vercel API
+const LOCAL_API = 'http://localhost:8000';
+const VERCEL_API = '';
+let useLocal = false;
+
+async function detectLocalServer() {
+  try {
+    const res = await fetch(`${LOCAL_API}/api/myntra?style_id=1234567`, { signal: AbortSignal.timeout(2000) });
+    useLocal = true;
+    console.log('✅ Local Selenium server detected');
+    showServerBadge(true);
+  } catch {
+    useLocal = false;
+    console.log('ℹ️ Using Vercel API');
+    showServerBadge(false);
+  }
+}
+
+function showServerBadge(isLocal) {
+  const badge = document.getElementById('serverBadge');
+  if (badge) {
+    badge.textContent = isLocal ? '🖥️ Local Server' : '☁️ Vercel API';
+    badge.style.color = isLocal ? '#22c55e' : '#a78bfa';
+  }
+}
+
+const API = { get base() { return useLocal ? LOCAL_API : VERCEL_API; } };
+const getAPI = () => useLocal ? LOCAL_API : VERCEL_API;
+detectLocalServer();
+
+/* ══ Tab switching ══════════════════════════════════════════════════════════ */
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', (tab === 'single' ? 0 : 1) === i));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${tab}`).classList.add('active');
+}
+
+/* ══ Single lookup ══════════════════════════════════════════════════════════ */
+let currentAsin = '', currentUrl = '', retryTimer = null;
+
+function saveHistory(asin, price) {
+  if (!price) return;
+  const key = `ps_${asin}`;
+  const arr = JSON.parse(localStorage.getItem(key) || '[]');
+  arr.push({ price, ts: Date.now() });
+  if (arr.length > 50) arr.splice(0, arr.length - 50);
+  localStorage.setItem(key, JSON.stringify(arr));
+}
+
+function showHistory(asin) {
+  const arr = JSON.parse(localStorage.getItem(`ps_${asin}`) || '[]');
+  const box = document.getElementById('historyBox');
+  if (!arr.length) { box.textContent = 'No history yet for this Style ID.'; return; }
+  const lines = arr.slice(-15).reverse().map(h => {
+    const d = new Date(h.ts);
+    return `${d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})} ${d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}  →  ₹${Number(h.price).toLocaleString('en-IN')}`;
+  });
+  box.textContent = 'Recent prices (newest first):\n' + lines.join('\n');
+}
+
+function showErr(msg) {
+  document.getElementById('errMsg').textContent = msg;
+  document.getElementById('errBox').classList.add('show');
+  document.getElementById('loader').classList.remove('show');
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('fetchBtn').disabled = false;
+}
+
+function showLoader() {
+  document.getElementById('loader').classList.add('show');
+  document.getElementById('errBox').classList.remove('show');
+  document.getElementById('result').classList.remove('show');
+}
+
+function showResult() {
+  document.getElementById('result').classList.add('show');
+  document.getElementById('loader').classList.remove('show');
+  document.getElementById('errBox').classList.remove('show');
+  document.getElementById('fetchBtn').disabled = false;
+}
+
+function setBadge(status) {
+  const el = document.getElementById('badge');
+  const map = { 'In Stock':['badge-in','In Stock'], 'Out of Stock':['badge-out','Out of Stock'], 'Unavailable':['badge-out','Unavailable'], 'Low Stock':['badge-low','Low Stock'] };
+  const [cls, label] = map[status] || ['badge-unk', status || 'Unknown'];
+  el.className = `badge ${cls}`; el.textContent = label;
+}
+
+function renderProduct(d) {
+  currentUrl = d.url;
+  setBadge(d.availability);
+  document.getElementById('title').textContent = d.title || 'Title unavailable';
+  document.getElementById('price').textContent = d.price ? `₹${Number(d.price).toLocaleString('en-IN')}` : (d.availability === 'Unavailable' ? 'Unavailable' : 'N/A');
+  document.getElementById('currency').textContent = d.price ? (d.currency || 'INR') : '—';
+  if (d.rating) {
+    const stars = '★'.repeat(Math.round(d.rating)) + '☆'.repeat(5 - Math.round(d.rating));
+    document.getElementById('rating').textContent = `${stars} ${d.rating}`;
+  } else {
+    document.getElementById('rating').textContent = 'N/A';
+  }
+  const rc = parseInt(d.rating_count || '0', 10);
+  document.getElementById('ratingCount').textContent = rc > 0 ? rc.toLocaleString('en-IN') : 'N/A';
+  const now = new Date();
+  document.getElementById('fetchedAt').textContent = now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('fetchedDate').textContent = now.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+  document.getElementById('asinDisplay').textContent = d.asin || currentAsin;
+  saveHistory(d.asin || currentAsin, d.price);
+  showHistory(d.asin || currentAsin);
+  showResult();
+}
+
+let singleRunning = false;
+
+async function fetchSingle(asin) {
+  const res  = await fetch(`${getAPI()}/api/myntra?style_id=${asin}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text = await res.text();
+  if (!text || !text.trim()) throw new Error('Empty response');
+  const data = JSON.parse(text);
+  // dead=true means product doesn't exist — throw special error to stop retrying
+  if (data.dead) throw Object.assign(new Error(data.error), { dead: true });
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+async function runForever(asin) {
+  const MAX = 3;
+  let attempt = 0;
+  while (singleRunning && attempt < MAX) {
+    attempt++;
+    const msgEl = document.getElementById('attemptMsg');
+    msgEl.textContent = attempt === 1 ? 'Fetching from Amazon…' : `Retrying… (${attempt}/${MAX})`;
+    if (attempt > 1) await sleep(2000);
+    try {
+      const data = await fetchSingle(asin);
+      if (!singleRunning) return;
+      renderProduct(data);
+      singleRunning = false;
+      return;
+    } catch(e) {
+      if (e.dead) {
+        singleRunning = false;
+        showErr('❌ Product not found — This ASIN does not exist on Amazon or has been delisted.');
+        return;
+      }
+      if (attempt >= MAX) {
+        singleRunning = false;
+        showErr(`❌ Failed after ${MAX} attempts. ${e.message}`);
+        return;
+      }
     }
   }
+}
 
-  async function doFetch() {
-    const id  = document.getElementById('idInput').value.trim();
-    const btn = document.getElementById('fetchBtn');
-    const loader = document.getElementById('loader');
-    const errBox = document.getElementById('errBox');
-    const result = document.getElementById('result');
-    if (!id) { errBox.textContent = 'Please enter a product ID.'; errBox.classList.add('show'); return; }
-    btn.disabled = true;
-    loader.classList.add('show');
-    errBox.classList.remove('show');
-    result.classList.remove('show');
-    // Simulate coming soon response
-    setTimeout(() => {
-      loader.classList.remove('show');
-      btn.disabled = false;
-      errBox.textContent = 'Myntra scraper is coming soon! Only Amazon is live right now.';
-      errBox.classList.add('show');
-    }, 1000);
+function run() {
+  // Cancel any running fetch
+  singleRunning = false;
+  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+
+  const raw    = document.getElementById('asin').value.trim();
+    const match  = raw.match(/\d{4,12}/);
+  if (!match) { showErr('Please enter a valid numeric Style ID'); return; }
+
+  currentAsin = match[0];
+  document.getElementById('asin').value = currentAsin;
+  document.getElementById('fetchBtn').disabled = true;
+  document.getElementById('errBox').classList.remove('show');
+  showLoader();
+
+  // Start infinite retry loop
+  singleRunning = true;
+  runForever(currentAsin);
+}
+
+function go(asin) { document.getElementById('asin').value = asin; run(); }
+function openAmz() { if (currentUrl) window.open(currentUrl, '_blank'); }
+function copyAsin() {
+  navigator.clipboard.writeText(currentAsin).then(() => {
+    const b = document.querySelectorAll('.btn-sec')[0];
+    const o = b.textContent; b.textContent = '✓ Copied';
+    setTimeout(() => b.textContent = o, 1500);
+  });
+}
+document.getElementById('asin').addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+
+/* ══ Bulk upload ════════════════════════════════════════════════════════════ */
+let uploadedAsins = [];
+let bulkResults   = [];
+let bulkRunning   = false;
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+}
+
+function handleFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['xlsx','xls','csv'].includes(ext)) {
+    alert('Please upload a .xlsx, .xls, or .csv file');
+    return;
   }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data  = new Uint8Array(e.target.result);
+      const wb    = XLSX.read(data, { type: 'array' });
+      const ws    = wb.Sheets[wb.SheetNames[0]];
+      const rows  = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+      // Find ASIN column (case-insensitive)
+      const sample = rows[0] || {};
+      const asinKey = Object.keys(sample).find(k => k.trim().toUpperCase().replace(/[_\s]/g,'') === 'STYLEID');
+
+      if (!asinKey) {
+        alert('Could not find an "ASIN" column in your file.\nPlease make sure the column header is exactly "ASIN".');
+        return;
+      }
+
+      // Extract and validate ASINs
+      uploadedAsins = rows
+        .map(r => (String(r[asinKey] || '')).trim())
+        .filter(a => /^\d{4,12}$/.test(a));
+
+      // Show file info
+      const icon = ext === 'csv' ? '📄' : '📊';
+      document.getElementById('fileIcon').textContent = icon;
+      document.getElementById('fileName').textContent = file.name;
+      document.getElementById('fileMeta').textContent =
+        `${uploadedAsins.length} valid ASINs found · ${rows.length} total rows`;
+      document.getElementById('fileInfo').classList.add('show');
+      document.getElementById('dropZone').style.display = 'none';
+      document.getElementById('bulkBtn').disabled = uploadedAsins.length === 0;
+
+      if (uploadedAsins.length === 0) {
+        alert('No valid Style IDs found. Style IDs must be numeric (4-12 digits).');
+      }
+    } catch(err) {
+      alert('Could not read file: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function clearFile() {
+  uploadedAsins = [];
+  bulkResults   = [];
+  document.getElementById('fileInput').value = '';
+  document.getElementById('fileInfo').classList.remove('show');
+  document.getElementById('dropZone').style.display = '';
+  document.getElementById('bulkBtn').disabled = true;
+  document.getElementById('progressWrap').classList.remove('show');
+  document.getElementById('bulkResults').classList.remove('show');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function isFailed(r) {
+  return !!(r.error || (!r.title && !r.price));
+}
+
+async function fetchOnceRaw(asin) {
+  const res  = await fetch(`${getAPI()}/api/myntra?style_id=${asin}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text = await res.text();
+  if (!text || !text.trim()) throw new Error('Empty response');
+  const data = JSON.parse(text);
+  if (data.dead) throw Object.assign(new Error(data.error), { dead: true });
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+// Each ASIN keeps retrying independently until success or maxAttempts
+async function fetchUntilSuccess(asin, idx) {
+  const MAX_ATTEMPTS = 4;
+  let attempt = 0;
+  while (attempt < MAX_ATTEMPTS) {
+    attempt++;
+    try {
+      if (attempt > 1) {
+        const backoff = Math.min(900 * attempt, 3500) + Math.random() * 400;
+        await sleep(backoff);
+      }
+      const data = await fetchOnceRaw(asin);
+      bulkResults[idx] = data;
+      return true;
+    } catch(e) {
+      if (e.dead) {
+        bulkResults[idx] = { asin, error: 'Not found on Amazon', title: null, price: null, rating: null, availability: 'Not Found' };
+        return false;
+      }
+      if (attempt >= MAX_ATTEMPTS) {
+        bulkResults[idx] = { asin, error: 'Blocked by Amazon', title: null, price: null, rating: null, availability: 'Blocked' };
+        return false;
+      }
+      bulkResults[idx] = { asin, error: `Retrying… (${attempt}/${MAX_ATTEMPTS})`, title: null, price: null, rating: null, availability: 'Retrying' };
+    }
+  }
+}
+
+function updateProgressUI(done, total, retryingCount) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  document.getElementById('progressLabel').textContent   = retryingCount > 0
+    ? `✅ ${done} done · 🔄 ${retryingCount} still fetching (auto-retrying)…`
+    : `Fetching all ${total} ASINs…`;
+  document.getElementById('progressBar').style.width     = pct + '%';
+  document.getElementById('progressCount').textContent   = `${done} / ${total}`;
+  document.getElementById('progressCurrent').textContent = retryingCount > 0
+    ? `${retryingCount} ASINs blocked by Amazon — retrying automatically until all succeed`
+    : `Fetched ${done} of ${total}…`;
+}
+
+async function startBulk() {
+  if (bulkRunning || uploadedAsins.length === 0) return;
+  bulkRunning = true;
+  bulkResults = [];
+
+    const total  = uploadedAsins.length;
+
+  document.getElementById('bulkBtn').disabled = true;
+  document.getElementById('progressWrap').classList.add('show');
+  document.getElementById('bulkResults').classList.remove('show');
+
+  // Pre-fill placeholders so indices are stable
+  for (let i = 0; i < total; i++) {
+    bulkResults.push({
+      asin: uploadedAsins[i], error: 'Pending',
+      title: null, price: null, rating: null, availability: 'Pending'
+    });
+  }
+
+  updateProgressUI(0, total, 0);
+
+  // Process in small concurrent batches with human-like pacing
+  // to avoid triggering Amazon's bot-burst detection
+  const CONCURRENCY = 10;         // max parallel requests at any time
+  const GAP_MS = 200;               // gap between starting each request in a batch
+
+  let allDone = false;
+  let doneCount = 0;
+
+  const uiInterval = setInterval(() => {
+    if (allDone) { clearInterval(uiInterval); return; }
+    const done     = bulkResults.filter(r => !isFailed(r) && r.availability !== 'Pending' && r.availability !== 'Retrying').length;
+    const retrying = bulkResults.filter(r => r.availability === 'Retrying' || r.availability === 'Pending').length;
+    updateProgressUI(done, total, retrying);
+    renderBulkTable(false);
+  }, 600);
+
+  // Simple worker-pool: CONCURRENCY workers pull from a shared queue
+  let nextIdx = 0;
+  async function worker() {
+    while (nextIdx < uploadedAsins.length) {
+      const idx = nextIdx++;
+      const asin = uploadedAsins[idx];
+      await fetchUntilSuccess(asin, idx);
+      await sleep(GAP_MS + Math.random() * 400);
+    }
+  }
+  const workers = Array.from({ length: CONCURRENCY }, () => worker());
+  await Promise.all(workers);
+
+  // ── Cleanup passes: retry anything still Blocked, multiple rounds ──
+  // Amazon's temp rate-limit clears over time, so several slower passes
+  // over just the failures recover almost all of them.
+  const MAX_CLEANUP_ROUNDS = 3;
+  for (let round = 1; round <= MAX_CLEANUP_ROUNDS; round++) {
+    let blockedIdxs = bulkResults
+      .map((r, i) => (r.availability === 'Blocked' ? i : -1))
+      .filter(i => i !== -1);
+
+    if (blockedIdxs.length === 0) break;
+
+    document.getElementById('progressCurrent').textContent =
+      `🔁 Cooldown pass ${round}/${MAX_CLEANUP_ROUNDS}: retrying ${blockedIdxs.length} blocked ASINs…`;
+    await sleep(2000 * round); // longer cooldown each round
+
+    const CLEANUP_CONCURRENCY = 8;
+    let cIdx = 0;
+    async function cleanupWorker() {
+      while (cIdx < blockedIdxs.length) {
+        const idx = blockedIdxs[cIdx++];
+        const asin = uploadedAsins[idx];
+        await fetchUntilSuccess(asin, idx);
+        await sleep(300 + Math.random() * 300);
+      }
+    }
+    const cleanupWorkers = Array.from({ length: CLEANUP_CONCURRENCY }, () => cleanupWorker());
+    await Promise.all(cleanupWorkers);
+    renderBulkTable(false);
+  }
+
+  allDone = true;
+  clearInterval(uiInterval);
+
+  const successCount = bulkResults.filter(r => !isFailed(r)).length;
+
+  document.getElementById('progressLabel').textContent   = '✓ Complete';
+  document.getElementById('progressBar').style.width     = '100%';
+  document.getElementById('progressCount').textContent   = `${total} / ${total}`;
+  document.getElementById('progressCurrent').textContent = `✅ All ${total} ASINs fetched successfully!`;
+
+  renderBulkTable(true);
+  bulkRunning = false;
+  document.getElementById('bulkBtn').disabled = false;
+}
+
+function availClass(status) {
+  if (status === 'In Stock')     return 'tbl-in';
+  if (status === 'Out of Stock') return 'tbl-out';
+  if (status === 'Unavailable')  return 'tbl-out';
+  if (status === 'Low Stock')    return 'tbl-low';
+  if (status === 'Error')        return 'tbl-err';
+  if (status === 'Retrying')     return 'tbl-retrying';
+  if (status === 'Pending')      return 'tbl-pending';
+  if (status === 'Not Found')    return 'tbl-notfound';
+  return 'tbl-unk';
+}
+
+function renderBulkTable(isFinal = true) {
+  const total   = bulkResults.length;
+  const failed  = bulkResults.filter(isFailed);
+  const success = total - failed.length;
+  const display = bulkResults.slice(0, 10);
+
+  document.getElementById('resultsTitle').textContent = `Results — ${total} ASINs`;
+
+  const retrying = bulkResults.filter(r => r.availability === 'Retrying' || r.availability === 'Pending').length;
+  let meta = `✅ ${success} fetched`;
+  if (retrying > 0) meta += ` · 🔄 ${retrying} auto-retrying…`;
+  document.getElementById('resultsMeta').textContent = meta;
+
+  // Show note if more than 10 — prompt download for full data
+  const moreNote = document.getElementById('moreNote');
+  if (total > 10) {
+    moreNote.textContent = `📋 Showing first 10 of ${total} ASINs on dashboard. Download the report to see all ${total} products.`;
+    moreNote.classList.add('show');
+  } else {
+    moreNote.classList.remove('show');
+  }
+
+  const tbody = document.getElementById('bulkTableBody');
+  tbody.innerHTML = display.map((r, i) => {
+    const isPending = r.availability === 'Pending' || r.availability === 'Retrying';
+    const titleTxt  = r.title
+      ? r.title.slice(0, 55) + (r.title.length > 55 ? '…' : '')
+      : (isPending ? '🔄 Fetching…' : isFailed(r) ? `⚠ ${r.error || 'No data'}` : '—');
+    return `
+    <tr>
+      <td style="color:var(--text3);font-size:11px">${i + 1}</td>
+      <td class="asin-cell">
+        <a href="https://www.myntra.com/${r.asin}" target="_blank"
+           style="color:var(--text);text-decoration:none;" title="Open on Amazon">
+          ${r.asin || '—'}
+        </a>
+      </td>
+      <td class="title-cell" title="${(r.title || '').replace(/"/g,"'")}">${titleTxt}</td>
+      <td class="price-cell">${r.price ? `₹${Number(r.price).toLocaleString('en-IN')}` : '—'}</td>
+      <td class="rating-cell">${r.rating ? `★ ${r.rating}` : '—'}</td>
+      <td style="color:var(--text2);font-size:12px">${r.rating_count && parseInt(r.rating_count,10) > 0 ? parseInt(r.rating_count,10).toLocaleString('en-IN') : '—'}</td>
+      <td><span class="tbl-badge ${availClass(r.availability)}">${r.availability || 'Unknown'}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('bulkResults').classList.add('show');
+}
+
+/* ── Download CSV ──────────────────────────────────────────────────────── */
+function downloadCSV() {
+  const now     = new Date().toISOString().slice(0, 10);
+  const headers = ['#','ASIN','Title','Price (INR)','Rating','Rating Count','Availability','Status','URL','Fetched At'];
+  const rows    = bulkResults.map((r, i) => [
+    i + 1,
+    r.asin || '',
+    `"${(r.title || r.error || '').replace(/"/g, '""')}"`,
+    r.price  || '',
+    r.rating || '',
+    r.rating_count || '',
+    r.availability || '',
+    isFailed(r) ? 'Failed' : 'Success',
+    r.url || `https://www.myntra.com/${r.asin}`,
+    `"${new Date().toLocaleString('en-IN')}"`,
+  ]);
+  const csv  = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }); // BOM for Excel compatibility
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `price-scout-${now}.csv`;
+  a.click();
+}
+
+/* ── Download Excel ────────────────────────────────────────────────────── */
+function downloadXLSX() {
+  const now    = new Date().toISOString().slice(0, 10);
+  
+  // Main data sheet
+  const wsData = [
+    ['#', 'ASIN', 'Title', 'Price (INR)', 'Rating', 'Rating Count', 'Availability', 'Status', 'Amazon URL', 'Fetched At'],
+    ...bulkResults.map((r, i) => [
+      i + 1,
+      r.asin || '',
+      r.title || r.error || '',
+      r.price  || '',
+      r.rating || '',
+      r.rating_count || '',
+      r.availability || '',
+      isFailed(r) ? 'Failed' : 'Success',
+      r.url || `https://www.myntra.com/${r.asin}`,
+      new Date().toLocaleString('en-IN'),
+    ])
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [
+    { wch: 4  }, { wch: 14 }, { wch: 55 }, { wch: 12 },
+    { wch: 8  }, { wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 42 }, { wch: 22 },
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, 'All Products');
+
+  // Failed sheet — easy to re-upload
+  const failedRows = bulkResults.filter(isFailed);
+  if (failedRows.length > 0) {
+    const failData = [
+      ['ASIN', 'Error', 'Amazon URL'],
+      ...failedRows.map(r => [
+        r.asin || '',
+        r.error || 'No data fetched',
+        `https://www.myntra.com/${r.asin}`,
+      ])
+    ];
+    const wsFail = XLSX.utils.aoa_to_sheet(failData);
+    wsFail['!cols'] = [{ wch: 14 }, { wch: 30 }, { wch: 42 }];
+    XLSX.utils.book_append_sheet(wb, wsFail, 'Failed ASINs');
+  }
+
+  // Summary sheet
+  const successCount  = bulkResults.filter(r => !isFailed(r)).length;
+  const outOfStock    = bulkResults.filter(r => r.availability === 'Out of Stock').length;
+  const prices        = bulkResults.filter(r => r.price).map(r => r.price);
+  const avgPrice      = prices.length ? Math.round(prices.reduce((a,b) => a+b, 0) / prices.length) : 0;
+  const minPrice      = prices.length ? Math.min(...prices) : 0;
+  const maxPrice      = prices.length ? Math.max(...prices) : 0;
+
+  const summaryData = [
+    ['Price Scout Report — Summary'],
+    [''],
+    ['Generated',          new Date().toLocaleString('en-IN')],
+    [''],
+    ['Total ASINs',        bulkResults.length],
+    ['Successfully Fetched', successCount],
+    ['Failed / Not Found', failedRows.length],
+    ['Out of Stock',       outOfStock],
+    [''],
+    ['Average Price (INR)', avgPrice],
+    ['Min Price (INR)',     minPrice],
+    ['Max Price (INR)',     maxPrice],
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
+  ws2['!cols'] = [{ wch: 25 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+
+  XLSX.writeFile(wb, `price-scout-${now}.xlsx`);
+}
 </script>
 </body>
 </html>

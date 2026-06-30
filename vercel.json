@@ -2,10 +2,12 @@
   "version": 2,
   "builds": [
     { "src": "api/product.py", "use": "@vercel/python" },
+    { "src": "api/myntra.py", "use": "@vercel/python" },
     { "src": "*.html", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/product", "dest": "/api/product.py" },
+    { "src": "/api/myntra",  "dest": "/api/myntra.py" },
     { "src": "/amazon",   "dest": "/amazon.html" },
     { "src": "/flipkart", "dest": "/flipkart.html" },
     { "src": "/myntra",   "dest": "/myntra.html" },
