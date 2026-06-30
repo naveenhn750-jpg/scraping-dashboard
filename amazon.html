@@ -763,12 +763,15 @@ async function fetchOnceRaw(asin, domain) {
 
 // Each ASIN keeps retrying independently until success or maxAttempts
 async function fetchUntilSuccess(asin, domain, idx) {
-  const MAX_ATTEMPTS = 3;
+  const MAX_ATTEMPTS = 6;
   let attempt = 0;
   while (attempt < MAX_ATTEMPTS) {
     attempt++;
     try {
-      if (attempt > 1) await sleep(1500 * attempt);
+      if (attempt > 1) {
+        const backoff = Math.min(2000 * attempt, 12000) + Math.random() * 1000;
+        await sleep(backoff);
+      }
       const data = await fetchOnceRaw(asin, domain);
       bulkResults[idx] = data;
       return true;
@@ -820,14 +823,14 @@ async function startBulk() {
 
   updateProgressUI(0, total, 0);
 
-  // All ASINs fire simultaneously — staggered 150ms apart
-  // Each one independently keeps retrying until it gets data (up to 20 attempts)
-  const promises = uploadedAsins.map((asin, idx) =>
-    sleep(idx * 150).then(() => fetchUntilSuccess(asin, domain, idx))
-  );
+  // Process in small concurrent batches with human-like pacing
+  // to avoid triggering Amazon's bot-burst detection
+  const CONCURRENCY = 3;          // max parallel requests at any time
+  const GAP_MS = 900;             // gap between starting each request in a batch
 
-  // Refresh UI + table every 600ms while running
   let allDone = false;
+  let doneCount = 0;
+
   const uiInterval = setInterval(() => {
     if (allDone) { clearInterval(uiInterval); return; }
     const done     = bulkResults.filter(r => !isFailed(r) && r.availability !== 'Pending' && r.availability !== 'Retrying').length;
@@ -836,8 +839,19 @@ async function startBulk() {
     renderBulkTable(false);
   }, 600);
 
-  // Wait for every ASIN to finish (success or exhausted retries)
-  await Promise.all(promises);
+  // Simple worker-pool: CONCURRENCY workers pull from a shared queue
+  let nextIdx = 0;
+  async function worker() {
+    while (nextIdx < uploadedAsins.length) {
+      const idx = nextIdx++;
+      const asin = uploadedAsins[idx];
+      await fetchUntilSuccess(asin, domain, idx);
+      await sleep(GAP_MS + Math.random() * 400);
+    }
+  }
+  const workers = Array.from({ length: CONCURRENCY }, () => worker());
+  await Promise.all(workers);
+
   allDone = true;
   clearInterval(uiInterval);
 
