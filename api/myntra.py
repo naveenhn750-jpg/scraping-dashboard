@@ -43,7 +43,7 @@ def is_dead_page(html):
     return any(x in low for x in ["page not found", "404", "we are unable to find"]) and "pdpdata" not in low and "__myx" not in low
 
 def fetch_myntra_html(style_id, max_attempts=3):
-    url = f"https://www.myntra.com/x/{style_id}"
+    url = f"https://www.myntra.com/{style_id}"
     for attempt in range(max_attempts):
         try:
             if attempt > 0:
