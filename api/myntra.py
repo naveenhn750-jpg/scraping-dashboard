@@ -52,7 +52,7 @@ def fetch_myntra_html(style_id, max_attempts=3):
             session.headers.update(get_headers())
             resp = session.get(url, timeout=8, allow_redirects=True)
             if resp.status_code == 404:
-                return None, "DEAD_PAGE"
+                return None, None, "DEAD_PAGE"
             if resp.status_code in (403, 429, 503):
                 continue
             if resp.status_code != 200:
@@ -60,10 +60,10 @@ def fetch_myntra_html(style_id, max_attempts=3):
             html = resp.text
             if is_blocked(html):
                 continue
-            return html, None
+            return html, resp.url, None
         except Exception:
             continue
-    return None, "Myntra blocked the request. Try again in a moment."
+    return None, None, "Myntra blocked the request. Try again in a moment."
 
 def extract_embedded_json(html):
     """Myntra embeds product data as window.__myx = {...} in a <script> tag."""
@@ -84,7 +84,7 @@ def extract_embedded_json(html):
                     continue
     return None
 
-def parse_myntra(html, style_id):
+def parse_myntra(html, style_id, resolved_url=None):
     data = extract_embedded_json(html)
 
     title = None
@@ -160,7 +160,7 @@ def parse_myntra(html, style_id):
     return {
         "asin": style_id,
         "style_id": style_id,
-        "url": f"https://www.myntra.com/{style_id}",
+        "url": resolved_url or f"https://www.myntra.com/{style_id}",
         "title": title,
         "brand": brand,
         "price": price,
@@ -173,12 +173,12 @@ def parse_myntra(html, style_id):
     }
 
 def scrape(style_id):
-    html, err = fetch_myntra_html(style_id)
+    html, resolved_url, err = fetch_myntra_html(style_id)
     if err == "DEAD_PAGE":
         return {"error": "Product not found. Check the Style ID.", "status": 404, "dead": True}
     if err:
         return {"error": err, "status": 422}
-    result = parse_myntra(html, style_id)
+    result = parse_myntra(html, style_id, resolved_url)
     if not result["title"] and not result["price"]:
         return {"error": "Could not extract data. Try again.", "status": 422}
     return result
