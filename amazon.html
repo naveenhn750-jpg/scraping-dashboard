@@ -577,7 +577,7 @@ function showResult() {
 
 function setBadge(status) {
   const el = document.getElementById('badge');
-  const map = { 'In Stock':['badge-in','In Stock'], 'Out of Stock':['badge-out','Out of Stock'], 'Low Stock':['badge-low','Low Stock'] };
+  const map = { 'In Stock':['badge-in','In Stock'], 'Out of Stock':['badge-out','Out of Stock'], 'Unavailable':['badge-out','Unavailable'], 'Low Stock':['badge-low','Low Stock'] };
   const [cls, label] = map[status] || ['badge-unk', status || 'Unknown'];
   el.className = `badge ${cls}`; el.textContent = label;
 }
@@ -586,7 +586,7 @@ function renderProduct(d) {
   currentUrl = d.url;
   setBadge(d.availability);
   document.getElementById('title').textContent = d.title || 'Title unavailable';
-  document.getElementById('price').textContent = d.price ? `₹${Number(d.price).toLocaleString('en-IN')}` : 'N/A';
+  document.getElementById('price').textContent = d.price ? `₹${Number(d.price).toLocaleString('en-IN')}` : (d.availability === 'Unavailable' ? 'Unavailable' : 'N/A');
   document.getElementById('currency').textContent = d.price ? (d.currency || 'INR') : '—';
   if (d.rating) {
     const stars = '★'.repeat(Math.round(d.rating)) + '☆'.repeat(5 - Math.round(d.rating));
@@ -878,6 +878,7 @@ async function startBulk() {
 function availClass(status) {
   if (status === 'In Stock')     return 'tbl-in';
   if (status === 'Out of Stock') return 'tbl-out';
+  if (status === 'Unavailable')  return 'tbl-out';
   if (status === 'Low Stock')    return 'tbl-low';
   if (status === 'Error')        return 'tbl-err';
   if (status === 'Retrying')     return 'tbl-retrying';

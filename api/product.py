@@ -134,18 +134,30 @@ def parse_amazon(html, asin, domain):
     av = soup.find("div", {"id": "availability"})
     if av:
         txt = av.get_text(strip=True).lower()
-        if "in stock" in txt:
+        if "currently unavailable" in txt:
+            availability = "Unavailable"
+            price = None
+        elif "in stock" in txt:
             availability = "In Stock"
         elif "only" in txt and "left" in txt:
             availability = "Low Stock"
-        elif any(x in txt for x in ["out of stock", "unavailable", "not available", "currently unavailable"]):
-            availability = "Out of Stock"
+        elif any(x in txt for x in ["out of stock", "unavailable", "not available"]):
+            availability = "Unavailable"
+            price = None
         else:
             availability = av.get_text(strip=True)[:40]
     elif price:
         availability = "In Stock"
     else:
-        availability = "Out of Stock"
+        availability = "Unavailable"
+
+    # Double-check: if the whole page mentions "currently unavailable" near the buybox
+    # but the #availability div wasn't found, scan a wider area as fallback
+    if availability == "Unknown":
+        buybox = soup.find("div", {"id": "buybox"}) or soup.find("div", {"id": "centerCol"})
+        if buybox and "currently unavailable" in buybox.get_text(strip=True).lower():
+            availability = "Unavailable"
+            price = None
 
     return {
         "asin": asin,
