@@ -290,7 +290,7 @@
 
     <div class="loader" id="loader">
       <div class="ring"></div>
-      <div class="loader-msg">Fetching from Amazon…</div>
+      <div class="loader-msg">Fetching from Myntra…</div>
       <div class="loader-attempt" id="attemptMsg">Connecting…</div>
     </div>
 
@@ -620,7 +620,7 @@ async function runForever(asin) {
   while (singleRunning && attempt < MAX) {
     attempt++;
     const msgEl = document.getElementById('attemptMsg');
-    msgEl.textContent = attempt === 1 ? 'Fetching from Amazon…' : `Retrying… (${attempt}/${MAX})`;
+    msgEl.textContent = attempt === 1 ? 'Fetching from Myntra…' : `Retrying… (${attempt}/${MAX})`;
     if (attempt > 1) await sleep(2000);
     try {
       const data = await fetchSingle(asin);
