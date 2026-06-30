@@ -123,8 +123,9 @@ def fetch_myntra_html(style_id, max_attempts=3):
         html, resolved_url, perr = fetch_via_scrapingbee(url)
         if html and not perr:
             return html, resolved_url, None
+        return None, None, f"Myntra blocked direct request; proxy also failed: {perr}"
 
-    return None, None, f"Myntra blocked the request (last status: {last_status}). Try again in a moment."
+    return None, None, f"Myntra blocked the request (last status: {last_status}, no proxy key set). Try again in a moment."
 
 def extract_embedded_json(html):
     """Myntra embeds product data as window.__myx = {...} in a <script> tag."""
