@@ -303,7 +303,7 @@
       <div class="card">
         <div id="badge" class="badge badge-unk">Unknown</div>
         <div class="product-title" id="title">—</div>
-        <div class="stats">
+        <div class="stats" style="grid-template-columns: repeat(4, 1fr);">
           <div class="stat">
             <div class="stat-label">Current Price</div>
             <div class="stat-value price-val" id="price">—</div>
@@ -312,7 +312,12 @@
           <div class="stat">
             <div class="stat-label">Rating</div>
             <div class="stat-value rating-val" id="rating">—</div>
-            <div class="stat-sub">out of 5</div>
+            <div class="stat-sub" id="ratingCountSub">out of 5</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Reviews</div>
+            <div class="stat-value" id="ratingCount" style="color:var(--text2)">—</div>
+            <div class="stat-sub">total ratings</div>
           </div>
           <div class="stat">
             <div class="stat-label">Last Fetched</div>
@@ -475,6 +480,7 @@
               <th>Title</th>
               <th>Price</th>
               <th>Rating</th>
+              <th>Reviews</th>
               <th>Availability</th>
             </tr>
           </thead>
@@ -588,6 +594,8 @@ function renderProduct(d) {
   } else {
     document.getElementById('rating').textContent = 'N/A';
   }
+  const rc = parseInt(d.rating_count || '0', 10);
+  document.getElementById('ratingCount').textContent = rc > 0 ? rc.toLocaleString('en-IN') : 'N/A';
   const now = new Date();
   document.getElementById('fetchedAt').textContent = now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
   document.getElementById('fetchedDate').textContent = now.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
@@ -918,6 +926,7 @@ function renderBulkTable(isFinal = true) {
       <td class="title-cell" title="${(r.title || '').replace(/"/g,"'")}">${titleTxt}</td>
       <td class="price-cell">${r.price ? `₹${Number(r.price).toLocaleString('en-IN')}` : '—'}</td>
       <td class="rating-cell">${r.rating ? `★ ${r.rating}` : '—'}</td>
+      <td style="color:var(--text2);font-size:12px">${r.rating_count && parseInt(r.rating_count,10) > 0 ? parseInt(r.rating_count,10).toLocaleString('en-IN') : '—'}</td>
       <td><span class="tbl-badge ${availClass(r.availability)}">${r.availability || 'Unknown'}</span></td>
     </tr>`;
   }).join('');
@@ -928,13 +937,14 @@ function renderBulkTable(isFinal = true) {
 /* ── Download CSV ──────────────────────────────────────────────────────── */
 function downloadCSV() {
   const now     = new Date().toISOString().slice(0, 10);
-  const headers = ['#','ASIN','Title','Price (INR)','Rating','Availability','Status','URL','Fetched At'];
+  const headers = ['#','ASIN','Title','Price (INR)','Rating','Rating Count','Availability','Status','URL','Fetched At'];
   const rows    = bulkResults.map((r, i) => [
     i + 1,
     r.asin || '',
     `"${(r.title || r.error || '').replace(/"/g, '""')}"`,
     r.price  || '',
     r.rating || '',
+    r.rating_count || '',
     r.availability || '',
     isFailed(r) ? 'Failed' : 'Success',
     r.url || `https://www.amazon.in/dp/${r.asin}`,
@@ -955,13 +965,14 @@ function downloadXLSX() {
 
   // Main data sheet
   const wsData = [
-    ['#', 'ASIN', 'Title', 'Price (INR)', 'Rating', 'Availability', 'Status', 'Amazon URL', 'Fetched At'],
+    ['#', 'ASIN', 'Title', 'Price (INR)', 'Rating', 'Rating Count', 'Availability', 'Status', 'Amazon URL', 'Fetched At'],
     ...bulkResults.map((r, i) => [
       i + 1,
       r.asin || '',
       r.title || r.error || '',
       r.price  || '',
       r.rating || '',
+      r.rating_count || '',
       r.availability || '',
       isFailed(r) ? 'Failed' : 'Success',
       r.url || `https://www.amazon.in/dp/${r.asin}`,
@@ -973,7 +984,7 @@ function downloadXLSX() {
   const ws = XLSX.utils.aoa_to_sheet(wsData);
   ws['!cols'] = [
     { wch: 4  }, { wch: 14 }, { wch: 55 }, { wch: 12 },
-    { wch: 8  }, { wch: 15 }, { wch: 10 }, { wch: 42 }, { wch: 22 },
+    { wch: 8  }, { wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 42 }, { wch: 22 },
   ];
   XLSX.utils.book_append_sheet(wb, ws, 'All Products');
 
