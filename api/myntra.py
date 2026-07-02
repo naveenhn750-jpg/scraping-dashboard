@@ -3,12 +3,14 @@ import json
 import re
 import time
 import random
+import os
 from urllib.parse import urlparse, parse_qs
 import requests
 
+SCRAPINGBEE_KEY = os.environ.get("SCRAPER_API_KEY", "")
+
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 ]
@@ -16,99 +18,114 @@ USER_AGENTS = [
 def get_headers():
     return {
         "User-Agent": random.choice(USER_AGENTS),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-IN,en-US;q=0.9,en;q=0.8",
         "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Cache-Control": "max-age=0",
         "Referer": "https://www.google.com/",
         "DNT": "1",
     }
+
+def has_product_data(html):
+    if not html:
+        return False
+    low = html.lower()
+    return any(x in low for x in ["__myx", "pdpdata", "discounted", "og:title", "pdp-title"])
 
 def is_blocked(html):
     if not html or len(html) < 500:
         return True
     low = html.lower()
-    return any(x in low for x in [
-        "captcha", "access denied", "are you a human", "automated access",
-        "unusual traffic", "ak_bmsc", "px-captcha", "perimeterx",
-    ])
-
-def has_product_data(html):
-    """Check if the page actually contains product info, not just an empty SPA shell."""
-    if not html:
-        return False
-    low = html.lower()
-    return ("__myx" in low or "pdpdata" in low or "productname" in low
-            or "discounted" in low or "og:title" in low)
+    return any(x in low for x in ["captcha", "access denied", "are you a human", "automated access"])
 
 def is_dead_page(html):
     if not html:
         return False
     low = html.lower()
-    return any(x in low for x in ["page not found", "404", "we are unable to find"]) and "pdpdata" not in low and "__myx" not in low
+    return "page not found" in low and "pdpdata" not in low
 
-def fetch_myntra_html(style_id, max_attempts=3):
-    url = f"https://www.myntra.com/{style_id}"
-    last_status = None
-    for attempt in range(max_attempts):
-        try:
-            if attempt > 0:
-                time.sleep(random.uniform(0.6, 1.4))
-            session = requests.Session()
-            headers = get_headers()
-            session.headers.update(headers)
-
-            # Step 1: hit homepage first to pick up Myntra's session/bot-check cookies
-            try:
-                session.get("https://www.myntra.com/", timeout=6)
-            except Exception:
-                pass
-
-            # Step 2: fetch the actual product page with the session's cookies
-            session.headers.update({
-                "Referer": "https://www.myntra.com/",
-                "Sec-Fetch-Site": "same-origin",
-            })
-            resp = session.get(url, timeout=8, allow_redirects=True)
-            last_status = resp.status_code
-            if resp.status_code == 404:
-                return None, None, "DEAD_PAGE"
-            if resp.status_code in (403, 429, 503):
-                continue
-            if resp.status_code != 200:
-                continue
+def fetch_via_scrapingbee(url):
+    """Fetch using ScrapingBee with JS rendering - needed for Myntra SPA."""
+    if not SCRAPINGBEE_KEY:
+        return None, None, "No proxy API key set."
+    try:
+        resp = requests.get(
+            "https://app.scrapingbee.com/api/v1/",
+            params={
+                "api_key": SCRAPINGBEE_KEY,
+                "url": url,
+                "render_js": "true",
+                "premium_proxy": "true",
+                "country_code": "in",
+                "wait": "4000",
+                "block_ads": "true",
+                "stealth_proxy": "true",
+            },
+            timeout=60,
+        )
+        if resp.status_code == 200:
             html = resp.text
-            if is_blocked(html):
-                last_status = "BLOCKED_CONTENT"
-                continue
-            if not has_product_data(html):
-                last_status = "NO_PRODUCT_DATA"
-                continue
-            return html, resp.url, None
-        except Exception as e:
-            last_status = f"EXC:{type(e).__name__}"
-            continue
-    return None, None, f"Myntra blocked the request (last status: {last_status}). Try again in a moment."
+            final_url = resp.headers.get("Spb-Resolved-Url") or url
+            if is_dead_page(html):
+                return None, None, "DEAD_PAGE"
+            return html, final_url, None
+        elif resp.status_code == 401:
+            return None, None, "Invalid proxy API key."
+        elif resp.status_code == 403:
+            return None, None, "Proxy quota exceeded."
+        elif resp.status_code == 422:
+            return None, None, f"Proxy error 422: {resp.text[:200]}"
+        else:
+            return None, None, f"Proxy HTTP {resp.status_code}: {resp.text[:200]}"
+    except requests.exceptions.Timeout:
+        return None, None, "Proxy timed out."
+    except Exception as e:
+        return None, None, f"Proxy exception: {str(e)}"
+
+def fetch_direct(url):
+    """Try direct fetch first - faster but likely blocked by Myntra."""
+    try:
+        session = requests.Session()
+        session.headers.update(get_headers())
+        try:
+            session.get("https://www.myntra.com/", timeout=5)
+        except Exception:
+            pass
+        session.headers.update({"Referer": "https://www.myntra.com/", "Sec-Fetch-Site": "same-origin"})
+        resp = session.get(url, timeout=8, allow_redirects=True)
+        if resp.status_code == 200 and has_product_data(resp.text):
+            return resp.text, resp.url, None
+        return None, None, f"Direct fetch failed: {resp.status_code}"
+    except Exception as e:
+        return None, None, f"Direct error: {str(e)}"
+
+def fetch_myntra(style_id):
+    url = f"https://www.myntra.com/{style_id}"
+
+    # Try direct first (free, fast)
+    html, resolved_url, err = fetch_direct(url)
+    if html:
+        return html, resolved_url, None
+
+    # Fall back to ScrapingBee (JS rendering, bypasses bot protection)
+    html, resolved_url, err = fetch_via_scrapingbee(url)
+    if html:
+        return html, resolved_url, None
+
+    return None, None, err or "Could not fetch product. Try again."
 
 def extract_embedded_json(html):
-    """Myntra embeds product data as window.__myx = {...} in a <script> tag."""
     patterns = [
         r"window\.__myx\s*=\s*(\{.*?\})\s*;?\s*</script>",
-        r"pdpData\s*[:=]\s*(\{.*?\})\s*,\s*\"",
+        r"pdpData\s*[:=]\s*(\{.*?\})\s*[,;]",
     ]
     for pattern in patterns:
         m = re.search(pattern, html, re.DOTALL)
         if m:
             raw = m.group(1)
-            # Try truncating progressively from the end in case of trailing garbage
-            for end_trim in range(0, 200, 5):
-                candidate = raw if end_trim == 0 else raw[:-end_trim]
+            for trim in range(0, 500, 10):
+                candidate = raw if trim == 0 else raw[:-trim]
                 try:
                     return json.loads(candidate)
                 except json.JSONDecodeError:
@@ -117,38 +134,29 @@ def extract_embedded_json(html):
 
 def parse_myntra(html, style_id, resolved_url=None):
     data = extract_embedded_json(html)
-
-    title = None
-    brand = None
-    price = None
-    mrp = None
-    rating = None
+    title = brand = price = mrp = rating = None
     rating_count = "0"
     availability = "Unknown"
 
     if data:
         pdp = data.get("pdpData") or data.get("style") or data
-        brand = (pdp.get("brand") or {}).get("name") if isinstance(pdp.get("brand"), dict) else pdp.get("brand")
-        name = pdp.get("name") or pdp.get("productName")
-        if brand and name:
-            title = f"{brand} {name}"
-        elif name:
-            title = name
+        brand_data = pdp.get("brand") or {}
+        brand = brand_data.get("name") if isinstance(brand_data, dict) else str(brand_data)
+        name  = pdp.get("name") or pdp.get("productName")
+        title = f"{brand} {name}" if brand and name else name
 
         pricing = pdp.get("price") or {}
         if isinstance(pricing, dict):
             price = pricing.get("discounted") or pricing.get("mrp")
-            mrp = pricing.get("mrp")
+            mrp   = pricing.get("mrp")
 
         rr = pdp.get("ratings") or pdp.get("productRatingsAndReview") or {}
         if isinstance(rr, dict):
             avg = rr.get("averageRating") or rr.get("avgRating")
             cnt = rr.get("totalCount") or rr.get("totalRatingsCount")
             if avg:
-                try:
-                    rating = float(avg)
-                except (TypeError, ValueError):
-                    pass
+                try: rating = float(avg)
+                except: pass
             if cnt:
                 rating_count = str(cnt)
 
@@ -159,34 +167,34 @@ def parse_myntra(html, style_id, resolved_url=None):
         elif price:
             availability = "In Stock"
 
-    # Fallback: regex scan raw HTML if JSON parsing failed
+    # HTML regex fallbacks
     if not title:
-        m = re.search(r'"name"\s*:\s*"([^"]{3,150})"', html)
-        if m:
-            title = m.group(1)
+        for pat in [r'"og:title"\s+content="([^"]{3,150})"', r'"name"\s*:\s*"([^"]{3,150})"']:
+            m = re.search(pat, html)
+            if m:
+                title = m.group(1)
+                break
     if not price:
-        m = re.search(r'"discounted"\s*:\s*([\d.]+)', html) or re.search(r'"mrp"\s*:\s*([\d.]+)', html)
-        if m:
-            try:
-                price = float(m.group(1))
-            except ValueError:
-                pass
+        for pat in [r'"discounted"\s*:\s*([\d.]+)', r'"mrp"\s*:\s*([\d.]+)'
+                    r'class="pdp-price"[^>]*>.*?₹\s*([\d,]+)']:
+            m = re.search(pat, html)
+            if m:
+                try:
+                    price = float(m.group(1).replace(",", ""))
+                    break
+                except: pass
     if not rating:
         m = re.search(r'"averageRating"\s*:\s*"?([\d.]+)"?', html)
         if m:
-            try:
-                rating = float(m.group(1))
-            except ValueError:
-                pass
+            try: rating = float(m.group(1))
+            except: pass
     if rating_count == "0":
         m = re.search(r'"totalCount"\s*:\s*(\d+)', html)
         if m:
             rating_count = m.group(1)
 
-    if availability == "Unknown" and price:
-        availability = "In Stock"
-    elif availability == "Unknown":
-        availability = "Unavailable"
+    if availability == "Unknown":
+        availability = "In Stock" if price else "Unavailable"
 
     return {
         "asin": style_id,
@@ -194,8 +202,8 @@ def parse_myntra(html, style_id, resolved_url=None):
         "url": resolved_url or f"https://www.myntra.com/{style_id}",
         "title": title,
         "brand": brand,
-        "price": price,
-        "mrp": mrp,
+        "price": float(price) if price else None,
+        "mrp": float(mrp) if mrp else None,
         "currency": "INR",
         "rating": rating,
         "rating_count": rating_count,
@@ -204,14 +212,14 @@ def parse_myntra(html, style_id, resolved_url=None):
     }
 
 def scrape(style_id):
-    html, resolved_url, err = fetch_myntra_html(style_id)
+    html, resolved_url, err = fetch_myntra(style_id)
     if err == "DEAD_PAGE":
         return {"error": "Product not found. Check the Style ID.", "status": 404, "dead": True}
-    if err:
+    if err and not html:
         return {"error": err, "status": 422}
     result = parse_myntra(html, style_id, resolved_url)
     if not result["title"] and not result["price"]:
-        return {"error": "Could not extract data. Try again.", "status": 422}
+        return {"error": "Could not extract product data. Try again.", "status": 422}
     return result
 
 class handler(BaseHTTPRequestHandler):
@@ -228,7 +236,7 @@ class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            params = parse_qs(urlparse(self.path).query)
+            params   = parse_qs(urlparse(self.path).query)
             style_id = params.get("style_id", [""])[0].strip()
             if not style_id or not re.match(r"^\d{4,12}$", style_id):
                 self.send_json({"error": "Invalid Style ID.", "status": 400})
